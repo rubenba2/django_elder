@@ -1,15 +1,1 @@
-When the dependent variable in panel data is binary and overwhelmingly dominated by one outcome (e.g., 0 occurs 98% of the time and 1 occurs only 2%), panel data models (especially fixed effects models) run into several problems:
 
-Lack of Within-Unit Variation:
-Fixed effects methods rely on variation within each entity over time. If most entities almost never experience the rare outcome (e.g., they are always 0), there's no variation within those units. This means for many entities, the model cannot identify how changes in predictors might relate to changes in the outcome, because the outcome never actually changes.
-
-Data Sparsity and Identification Issues:
-With so few occurrences of the minority outcome (1s), the model has very little information on what conditions lead to that outcome. Entities that never switch from 0 to 1 provide no identifying variation for the fixed effects model. As a result, the model may discard a large portion of the sample or become statistically unstable.
-
-Quasi-Complete Separation or Perfect Prediction:
-When one outcome is extremely rare, it can become easy for the model to “learn” simple conditions that perfectly separate the few 1s from the 0s. This is known as quasi-complete separation. It undermines model estimation because maximum likelihood estimation can fail to converge, or can produce unstable, very large coefficient estimates.
-
-Biased and Unreliable Estimates:
-Without sufficient within-entity variation and with such a skewed distribution of outcomes, the resulting estimates from panel methods can be misleading. They may overfit to the rare events, produce inflated confidence intervals, or give coefficients that don't generalize well.
-
-In sum, when the binary dependent variable exhibits such extreme class imbalance, the key statistical assumptions that panel data methods rely on—enough within-unit variation to identify effects—no longer hold. This makes standard panel data modeling approaches (like fixed effects logistic regression) either fail to converge, yield unreliable estimates, or effectively ignore large parts of the data.
