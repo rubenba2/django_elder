@@ -1,54 +1,40 @@
-import pandas as pd
+# imports.py
+
+import subprocess
+import sys
+
+# List of required packages
+required_packages = [
+    'numpy',
+    'pandas',
+    'matplotlib',
+    'scikit-learn',  # Add any other packages you need
+]
+
+# Function to install missing packages
+def install_package(package):
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', package])
+
+# Check and install missing packages
+for package in required_packages:
+    try:
+        __import__(package)
+        print(f"{package} is already installed.")
+    except ImportError:
+        print(f"{package} not found. Installing...")
+        install_package(package)
+
+# Import the packages
 import numpy as np
-import statsmodels.api as sm
-import seaborn as sns
+import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn import datasets  # Example import for scikit-learn
 
-# Load the Titanic dataset from seaborn
-titanic = sns.load_dataset('titanic')
+# Optional: Add any custom configurations or helper functions
+def setup_environment():
+    pd.set_option('display.max_columns', None)
+    plt.style.use('ggplot')
+    print("Environment setup complete.")
 
-# Drop rows with missing values for simplicity
-titanic = titanic.dropna(subset=['age', 'fare', 'pclass', 'sex', 'sibsp', 'survived'])
-
-# Define the independent variables (5 variables) and the dependent variable
-X = titanic[['age', 'fare', 'pclass', 'sex', 'sibsp']]
-X = pd.get_dummies(X, columns=['sex'], drop_first=True)  # Convert 'sex' to binary (male=1, female=0)
-y = titanic['survived']
-
-# Add a constant to the independent variables for the intercept
-X = sm.add_constant(X)
-
-# Initialize an array to store the bootstrapped coefficients
-n_bootstraps = 1000
-coefficients = np.zeros((n_bootstraps, X.shape[1]))
-
-# Perform bootstrapping
-for i in range(n_bootstraps):
-    # Sample with replacement
-    sample_indices = np.random.choice(X.index, size=len(X), replace=True)
-    X_sample = X.loc[sample_indices]
-    y_sample = y.loc[sample_indices]
-    
-    # Fit the logistic regression model
-    model = sm.Logit(y_sample, X_sample).fit(disp=0)
-    
-    # Save the coefficients
-    coefficients[i] = model.params
-
-# Save the results to a DataFrame
-results = pd.DataFrame(coefficients, columns=X.columns)
-
-# Plot the distribution of the coefficients
-plt.figure(figsize=(12, 8))
-for i, column in enumerate(results.columns):
-    plt.subplot(2, 3, i + 1)
-    sns.histplot(results[column], kde=True)
-    plt.title(f'Distribution of {column}')
-    plt.xlabel('Coefficient Value')
-    plt.ylabel('Frequency')
-
-plt.tight_layout()
-plt.show()
-
-# Save the results to a CSV file
-results.to_csv('bootstrap_results.csv', index=False)
+# Run the setup function
+setup_environment()
