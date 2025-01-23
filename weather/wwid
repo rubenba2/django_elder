@@ -1,40 +1,30 @@
-# imports.py
-
-import subprocess
-import sys
-
-# List of required packages
-required_packages = [
-    'numpy',
-    'pandas',
-    'matplotlib',
-    'scikit-learn',  # Add any other packages you need
-]
-
-# Function to install missing packages
 def install_package(package):
-    subprocess.check_call([sys.executable, '-m', 'pip', 'install', package])
-
-# Check and install missing packages
-for package in required_packages:
+    """
+    Install a package using conda if available, otherwise use pip.
+    """
     try:
-        __import__(package)
-        print(f"{package} is already installed.")
-    except ImportError:
-        print(f"{package} not found. Installing...")
-        install_package(package)
+        # Try installing with conda first
+        subprocess.check_call([sys.executable, '-m', 'conda', 'install', '-y', package])
+    except:
+        # If conda fails, use pip
+        subprocess.check_call([sys.executable, '-m', 'pip', 'install', package])
 
-# Import the packages
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from sklearn import datasets  # Example import for scikit-learn
+def import_or_install(packages):
+    """
+    Import packages, and install them if they are not available.
+    """
+    for package in packages:
+        try:
+            # Try to import the package
+            __import__(package)
+            print(f"{package} is already installed and imported.")
+        except ImportError:
+            # If import fails, install the package
+            print(f"{package} not found. Installing...")
+            install_package(package)
+            # Try importing again after installation
+            __import__(package)
+            print(f"{package} has been installed and imported.")
 
-# Optional: Add any custom configurations or helper functions
-def setup_environment():
-    pd.set_option('display.max_columns', None)
-    plt.style.use('ggplot')
-    print("Environment setup complete.")
-
-# Run the setup function
-setup_environment()
+# Import or install all required packages
+import_or_install(required_packages)
