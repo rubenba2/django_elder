@@ -1,3 +1,7 @@
+# Extract residuals from the logistic regression
+residuals = logit_results.resid_response
+df['residuals'] = residuals
+
 # Reshape residuals into a panel structure
 residual_matrix = df.pivot(index='indivi# Compute pairwise correlations between individuals
 correlation_matrix = residual_matrix.corr()
