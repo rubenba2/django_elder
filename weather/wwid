@@ -1,16 +1,16 @@
-import importlib
-import subprocess
+# Reshape residuals into a panel structure
+residual_matrix = df.pivot(index='indivi# Compute pairwise correlations between individuals
+correlation_matrix = residual_matrix.corr()
 
-def import_with_version(module_name, version):
-    try:
-        module = importlib.import_module(module_name)
-        if module.__version__ != version:
-            raise ImportError(f"{module_name} version {module.__version__} is installed, but version {version} is required.")
-    except ImportError:
-        print(f"{module_name} is not installed. Installing version {version}...")
-        subprocess.check_call(["pip", "install", f"{module_name}=={version}"])
-        module = importlib.import_module(module_name)
-    return module
+# Compute the Pesaran CD test statistic
+N = correlation_matrix.shape[0]  # Number of individuals
+T = correlation_matrix.shape[1]  # Number of time periods
+cd_statistic = np.sqrt(2 * T / (N * (N - 1))) * np.sum(np.triu(correlation_matrix, k=1))
 
-# Example usage
-np = import_with_version('numpy', '1.26.0')
+# Compute the p-value (under the null of no cross-sectional correlation)
+from scipy.stats import norm
+p_value = 2 * (1 - norm.cdf(np.abs(cd_statistic)))
+
+print(f"Pesaran CD Test Statistic: {cd_statistic}, P-value: {p_value}")dual_id', columns='time_period', values='residuals')
+
+
