@@ -1,20 +1,21 @@
-# Extract residuals from the logistic regression
-residuals = logit_results.resid_response
-df['residuals'] = residuals
+# Columns to exclude from processing
+exclude_cols = ['E']
 
-# Reshape residuals into a panel structure
-residual_matrix = df.pivot(index='indivi# Compute pairwise correlations between individuals
-correlation_matrix = residual_matrix.corr()
+# Step 1: Drop columns with more than 30% missing values (excluding specified columns)
+threshold = 0.3 * len(df)
+df_filtered = df.dropna(thresh=threshold, axis=1)
 
-# Compute the Pesaran CD test statistic
-N = correlation_matrix.shape[0]  # Number of individuals
-T = correlation_matrix.shape[1]  # Number of time periods
-cd_statistic = np.sqrt(2 * T / (N * (N - 1))) * np.sum(np.triu(correlation_matrix, k=1))
+# Step 2 & 3: Fill missing values based on data type
+for col in df_filtered.columns:
+    if col in exclude_cols:
+        continue  # Skip excluded columns
+    
+    if df_filtered[col].dtype == 'O':  # Categorical or String
+        mode_value = df_filtered[col].mode().iloc[0]  # Most frequent value
+        df_filtered[col].fillna(mode_value, inplace=True)
+    else:  # Numeric
+        median_value = df_filtered[col].median()  # Median of column
+        df_filtered[col].fillna(median_value, inplace=True)
 
-# Compute the p-value (under the null of no cross-sectional correlation)
-from scipy.stats import norm
-p_value = 2 * (1 - norm.cdf(np.abs(cd_statistic)))
-
-print(f"Pesaran CD Test Statistic: {cd_statistic}, P-value: {p_value}")dual_id', columns='time_period', values='residuals')
-
-
+# Display cleaned DataFrame
+print(df_filtered)
