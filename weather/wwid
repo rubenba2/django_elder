@@ -1,3 +1,15 @@
+import pandas as pd
+import numpy as np
+
+# Sample DataFrame
+df = pd.DataFrame({
+    'A': [1, 2, np.nan, 400, 5, np.nan],  # Numeric (with outlier)
+    'B': ['x', np.nan, 'y', 'y', np.nan, 'x'],  # Categorical
+    'C': [np.nan, np.nan, np.nan, 4, 5, 6],  # Numeric (High missing %)
+    'D': ['a', 'b', np.nan, 'd', 'e', 'f'],  # Categorical
+    'E': [10, 20, 30, 40, 50, 60]  # Excluded column
+})
+
 # Columns to exclude from processing
 exclude_cols = ['E']
 
@@ -5,17 +17,53 @@ exclude_cols = ['E']
 threshold = 0.3 * len(df)
 df_filtered = df.dropna(thresh=threshold, axis=1)
 
-# Step 2 & 3: Fill missing values based on data type
-for col in df_filtered.columns:
+# Dictionary to track capped/floored percentages
+capping_stats = {}
+
+# Step 2: Process numerical columns for capping and flooring
+for col in df_filtered.select_dtypes(include=['number']).columns:
     if col in exclude_cols:
         continue  # Skip excluded columns
     
-    if df_filtered[col].dtype == 'O':  # Categorical or String
-        mode_value = df_filtered[col].mode().iloc[0]  # Most frequent value
-        df_filtered[col].fillna(mode_value, inplace=True)
-    else:  # Numeric
-        median_value = df_filtered[col].median()  # Median of column
-        df_filtered[col].fillna(median_value, inplace=True)
+    Q1 = df_filtered[col].quantile(0.25)
+    Q3 = df_filtered[col].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+
+    # Count capped and floored values before modifying
+    num_capped = (df_filtered[col] > upper_bound).sum()
+    num_floored = (df_filtered[col] < lower_bound).sum()
+    total_values = df_filtered[col].count()  # Non-null values only
+
+    # Store capping stats as percentage of observations
+    if total_values > 0:
+        capping_stats[col] = (num_capped + num_floored) / total_values * 100
+
+    # Apply capping and flooring
+    df_filtered[col] = np.where(df_filtered[col] > upper_bound, upper_bound, df_filtered[col])
+    df_filtered[col] = np.where(df_filtered[col] < lower_bound, lower_bound, df_filtered[col])
+
+# Step 3: Replace missing values in numerical columns with the median
+for col in df_filtered.select_dtypes(include=['number']).columns:
+    if col in exclude_cols:
+        continue
+    median_value = df_filtered[col].median()
+    df_filtered[col].fillna(median_value, inplace=True)
+
+# Step 4: Replace missing values in categorical columns with mode
+for col in df_filtered.select_dtypes(include=['object']).columns:
+    if col in exclude_cols:
+        continue
+    mode_value = df_filtered[col].mode().iloc[0]  # Most frequent value
+    df_filtered[col].fillna(mode_value, inplace=True)
+
+# Step 5: Print top 20 variables by capping/flooring percentage
+capping_stats = sorted(capping_stats.items(), key=lambda x: x[1], reverse=True)
+print("\nTop 20 variables by percentage of observations capped/floored:")
+for col, pct in capping_stats[:20]:
+    print(f"{col}: {pct:.2f}%")
 
 # Display cleaned DataFrame
+print("\nProcessed DataFrame:")
 print(df_filtered)
