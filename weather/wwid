@@ -1,35 +1,67 @@
+import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.model_selection import train_test_split
 
-def stratified_split_by_obligor(df, target_col, obligor_col, test_size=0.3, random_state=42):
+def stratified_split_by_obligor(df, target_col, obligor_col, test_size=0.3, random_state=None):
     """
-    Split the dataframe into two parts, ensuring that all observations of the same obligor 
-    are assigned to the same split. The split is stratified by the target binary variable.
+    Performs a stratified split of a dataset while ensuring all observations of an obligor stay together.
 
     Parameters:
-    - df: DataFrame containing the data.
-    - target_col: String, name of the column containing the binary target variable (e.g., 'target').
-    - obligor_col: String, name of the column containing the obligor identifier.
-    - test_size: Float, proportion of the data to include in the test split (default is 0.3).
-    - random_state: Integer, seed for random number generator for reproducibility.
+    - df: Pandas DataFrame containing the data.
+    - target_col: Name of the binary target column.
+    - obligor_col: Name of the column representing the obligor ID.
+    - test_size: Proportion of the dataset to be used for testing.
+    - random_state: Random seed for reproducibility.
 
     Returns:
-    - train_df: DataFrame with the training split.
-    - test_df: DataFrame with the testing split.
+    - train_df: Training dataset.
+    - test_df: Testing dataset.
     """
-    # Step 1: Group by obligor and get the stratified split
-    obligors = df[obligor_col].unique()
-    
-    # Split the obligors into train and test groups, stratified by the target variable
+    obligor_groups = df.groupby(obligor_col)[target_col].first()  # Get target per obligor
     train_obligors, test_obligors = train_test_split(
-        obligors, 
-        test_size=test_size, 
-        stratify=df.groupby(obligor_col)[target_col].apply(lambda x: x.mode()[0]), 
+        obligor_groups.index,
+        test_size=test_size,
+        stratify=obligor_groups,  # Stratify on target variable
         random_state=random_state
     )
-    
-    # Step 2: Filter the dataframe by the split obligors
-    train_df = df[df[obligor_col].isin(train_obligors)]
-    test_df = df[df[obligor_col].isin(test_obligors)]
-    
+
+    train_df = df[df[obligor_col].isin(train_obligors)].copy()
+    test_df = df[df[obligor_col].isin(test_obligors)].copy()
+
     return train_df, test_df
+
+# Generate sample data
+np.random.seed(42)
+num_obligors = 100
+num_observations = 1000
+
+df = pd.DataFrame({
+    'obligor_id': np.random.randint(1, num_obligors + 1, num_observations),  # 100 unique obligors
+    'A': np.random.randn(num_observations),  # Feature column A
+    'target': np.random.choice([0, 1], size=num_observations, p=[0.7, 0.3])  # Binary target (70% zeros, 30% ones)
+})
+
+# Lists to store means of column A for train and test sets
+train_means = []
+test_means = []
+
+# Run the stratified split 100 times and calculate means
+for i in range(100):
+    train_df, test_df = stratified_split_by_obligor(df, target_col='target', obligor_col='obligor_id', test_size=0.3, random_state=i)
+    
+    train_means.append(train_df['A'].mean())  # Store train mean
+    test_means.append(test_df['A'].mean())  # Store test mean
+
+# Plot the distributions of means
+plt.figure(figsize=(10, 5))
+sns.kdeplot(train_means, label='Train Mean (A)', fill=True, color='blue', alpha=0.5)
+sns.kdeplot(test_means, label='Test Mean (A)', fill=True, color='red', alpha=0.5)
+plt.axvline(np.mean(train_means), color='blue', linestyle='dashed', label=f'Train Mean: {np.mean(train_means):.3f}')
+plt.axvline(np.mean(test_means), color='red', linestyle='dashed', label=f'Test Mean: {np.mean(test_means):.3f}')
+plt.legend()
+plt.title("Distribution of Column 'A' Mean Over 100 Train/Test Splits")
+plt.xlabel("Mean of Column 'A'")
+plt.ylabel("Density")
+plt.show()
