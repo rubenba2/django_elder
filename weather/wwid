@@ -8,30 +8,35 @@ import seaborn as sns
 
 
 
-# Stratified K-fold with panel data group constraint
 def stratified_kfold_with_groups(X, y, individual_id, n_splits=4):
-    # Stratified K-Fold cross-validation ensuring no split for individuals
-    unique_individuals = X['individual_id'].unique()
-    
-    # Stratified split for the target variable
+    """
+    Stratified K-fold cross-validation that respects the panel structure of the data.
+    Ensures that all observations for the same individual are placed either in the training or testing set.
+
+    Parameters:
+    - X: DataFrame or ndarray containing the independent variables.
+    - y: Series or ndarray containing the binary dependent variable (target).
+    - individual_id: Series containing unique individual identifiers (one per individual).
+    - n_splits: Integer, the number of splits/folds in the cross-validation. Default is 4.
+
+    Returns:
+    - train_idx, test_idx: Indices for training and testing splits respecting the individual_id groups.
+    """
+    # Create a StratifiedKFold object to split the data while preserving the distribution of the binary variable
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
 
-    # Iterate through splits
-    for train_idx, test_idx in skf.split(unique_individuals, y[unique_individuals]):
-        # Select training and testing individuals based on stratified split
-        train_individuals = unique_individuals[train_idx]
-        test_individuals = unique_individuals[test_idx]
+    # Ensure individuals are either in train or test, not both
+    for train_idx, test_idx in skf.split(X, y):
+        # Get the unique individuals in each fold's train and test indices
+        train_individuals = individual_id.iloc[train_idx].unique()
+        test_individuals = individual_id.iloc[test_idx].unique()
 
-        # Ensure all observations from a given individual are either in train or test (no split)
-        train_mask = X['individual_id'].isin(train_individuals)
-        test_mask = X['individual_id'].isin(test_individuals)
+        # If the same individual exists in both train and test, skip this split
+        if any(individual_id.isin(train_individuals) & individual_id.isin(test_individuals)):
+            continue
         
-        # Create training and testing sets
-        X_train, X_test = X[train_mask], X[test_mask]
-        y_train, y_test = y[train_mask], y[test_mask]
-        
-        # Yield each fold's train and test sets
-        yield X_train, X_test, y_train, y_test
+        # If no overlap of individuals, return the train and test indices
+        yield train_idx, test_idx
 
 
 
