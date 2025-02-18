@@ -1,1 +1,84 @@
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import StratifiedKFold
+from sklearn.metrics import roc_auc_score
+import statsmodels.api as sm
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+
+
+# Stratified K-fold with panel data group constraint
+def stratified_kfold_with_groups(X, y, individual_id, n_splits=4):
+    # Stratified K-Fold cross-validation ensuring no split for individuals
+    unique_individuals = X['individual_id'].unique()
+    
+    # Stratified split for the target variable
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+
+    # Iterate through splits
+    for train_idx, test_idx in skf.split(unique_individuals, y[unique_individuals]):
+        # Select training and testing individuals based on stratified split
+        train_individuals = unique_individuals[train_idx]
+        test_individuals = unique_individuals[test_idx]
+
+        # Ensure all observations from a given individual are either in train or test (no split)
+        train_mask = X['individual_id'].isin(train_individuals)
+        test_mask = X['individual_id'].isin(test_individuals)
+        
+        # Create training and testing sets
+        X_train, X_test = X[train_mask], X[test_mask]
+        y_train, y_test = y[train_mask], y[test_mask]
+        
+        # Yield each fold's train and test sets
+        yield X_train, X_test, y_train, y_test
+
+
+
+
+# Function to calculate Gini coefficient from AUC score
+def gini_auc(y_true, y_pred):
+    auc = roc_auc_score(y_true, y_pred)
+    return 2 * auc - 1  # Gini is 2 * AUC - 1
+
+# Perform Logistic Regression with k-fold cross-validation
+def kfold_logistic_regression(X, y, individual_id, n_splits=4):
+    train_ginis = []
+    test_ginis = []
+
+    # Stratified K-fold with groups
+    for X_train, X_test, y_train, y_test in stratified_kfold_with_groups(X, y, individual_id, n_splits):
+        # Fit logistic regression model using sm.Logit
+        model = sm.Logit(y_train, sm.add_constant(X_train))  # Adding constant for intercept
+        result = model.fit()
+
+        # Predictions on training and testing sets
+        y_train_pred = result.predict(sm.add_constant(X_train))  # Predict on training set
+        y_test_pred = result.predict(sm.add_constant(X_test))  # Predict on testing set
+
+        # Calculate Gini scores for both training and testing datasets
+        train_gini = gini_auc(y_train, y_train_pred)
+        test_gini = gini_auc(y_test, y_test_pred)
+
+        # Append the results
+        train_ginis.append(train_gini)
+        test_ginis.append(test_gini)
+
+    return train_ginis, test_ginis
+
+
+
+# Example: Assuming your data is loaded in `X`, `y`, and `individual_id`
+# Run K-fold cross-validation and logistic regression
+train_ginis, test_ginis = kfold_logistic_regression(X, y, individual_id, n_splits=4)
+
+# Plotting the Gini distributions
+plt.figure(figsize=(10, 6))
+sns.histplot(train_ginis, kde=True, label='Train Gini', color='blue', stat="density", linewidth=0)
+sns.histplot(test_ginis, kde=True, label='Test Gini', color='red', stat="density", linewidth=0)
+plt.title("Distribution of Gini Coefficients (Train vs Test)")
+plt.xlabel("Gini Coefficient")
+plt.ylabel("Density")
+plt.legend()
+plt.show()
 
