@@ -1,89 +1,35 @@
-import numpy as np
 import pandas as pd
-from sklearn.model_selection import StratifiedKFold
-from sklearn.metrics import roc_auc_score
-import statsmodels.api as sm
-import matplotlib.pyplot as plt
-import seaborn as sns
+from sklearn.model_selection import train_test_split
 
-
-
-def stratified_kfold_with_groups(X, y, individual_id, n_splits=4):
+def stratified_split_by_obligor(df, target_col, obligor_col, test_size=0.3, random_state=42):
     """
-    Stratified K-fold cross-validation that respects the panel structure of the data.
-    Ensures that all observations for the same individual are placed either in the training or testing set.
+    Split the dataframe into two parts, ensuring that all observations of the same obligor 
+    are assigned to the same split. The split is stratified by the target binary variable.
 
     Parameters:
-    - X: DataFrame or ndarray containing the independent variables.
-    - y: Series or ndarray containing the binary dependent variable (target).
-    - individual_id: Series containing unique individual identifiers (one per individual).
-    - n_splits: Integer, the number of splits/folds in the cross-validation. Default is 4.
+    - df: DataFrame containing the data.
+    - target_col: String, name of the column containing the binary target variable (e.g., 'target').
+    - obligor_col: String, name of the column containing the obligor identifier.
+    - test_size: Float, proportion of the data to include in the test split (default is 0.3).
+    - random_state: Integer, seed for random number generator for reproducibility.
 
     Returns:
-    - train_idx, test_idx: Indices for training and testing splits respecting the individual_id groups.
+    - train_df: DataFrame with the training split.
+    - test_df: DataFrame with the testing split.
     """
-    # Create a StratifiedKFold object to split the data while preserving the distribution of the binary variable
-    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
-
-    # Ensure individuals are either in train or test, not both
-    for train_idx, test_idx in skf.split(X, y):
-        # Get the unique individuals in each fold's train and test indices
-        train_individuals = individual_id.iloc[train_idx].unique()
-        test_individuals = individual_id.iloc[test_idx].unique()
-
-        # If the same individual exists in both train and test, skip this split
-        if any(individual_id.isin(train_individuals) & individual_id.isin(test_individuals)):
-            continue
-        
-        # If no overlap of individuals, return the train and test indices
-        yield train_idx, test_idx
-
-
-
-
-# Function to calculate Gini coefficient from AUC score
-def gini_auc(y_true, y_pred):
-    auc = roc_auc_score(y_true, y_pred)
-    return 2 * auc - 1  # Gini is 2 * AUC - 1
-
-# Perform Logistic Regression with k-fold cross-validation
-def kfold_logistic_regression(X, y, individual_id, n_splits=4):
-    train_ginis = []
-    test_ginis = []
-
-    # Stratified K-fold with groups
-    for X_train, X_test, y_train, y_test in stratified_kfold_with_groups(X, y, individual_id, n_splits):
-        # Fit logistic regression model using sm.Logit
-        model = sm.Logit(y_train, sm.add_constant(X_train))  # Adding constant for intercept
-        result = model.fit()
-
-        # Predictions on training and testing sets
-        y_train_pred = result.predict(sm.add_constant(X_train))  # Predict on training set
-        y_test_pred = result.predict(sm.add_constant(X_test))  # Predict on testing set
-
-        # Calculate Gini scores for both training and testing datasets
-        train_gini = gini_auc(y_train, y_train_pred)
-        test_gini = gini_auc(y_test, y_test_pred)
-
-        # Append the results
-        train_ginis.append(train_gini)
-        test_ginis.append(test_gini)
-
-    return train_ginis, test_ginis
-
-
-
-# Example: Assuming your data is loaded in `X`, `y`, and `individual_id`
-# Run K-fold cross-validation and logistic regression
-train_ginis, test_ginis = kfold_logistic_regression(X, y, individual_id, n_splits=4)
-
-# Plotting the Gini distributions
-plt.figure(figsize=(10, 6))
-sns.histplot(train_ginis, kde=True, label='Train Gini', color='blue', stat="density", linewidth=0)
-sns.histplot(test_ginis, kde=True, label='Test Gini', color='red', stat="density", linewidth=0)
-plt.title("Distribution of Gini Coefficients (Train vs Test)")
-plt.xlabel("Gini Coefficient")
-plt.ylabel("Density")
-plt.legend()
-plt.show()
-
+    # Step 1: Group by obligor and get the stratified split
+    obligors = df[obligor_col].unique()
+    
+    # Split the obligors into train and test groups, stratified by the target variable
+    train_obligors, test_obligors = train_test_split(
+        obligors, 
+        test_size=test_size, 
+        stratify=df.groupby(obligor_col)[target_col].apply(lambda x: x.mode()[0]), 
+        random_state=random_state
+    )
+    
+    # Step 2: Filter the dataframe by the split obligors
+    train_df = df[df[obligor_col].isin(train_obligors)]
+    test_df = df[df[obligor_col].isin(test_obligors)]
+    
+    return train_df, test_df
