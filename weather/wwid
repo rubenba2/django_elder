@@ -1,67 +1,46 @@
-import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.model_selection import train_test_split
 
-def stratified_split_by_obligor(df, target_col, obligor_col, test_size=0.3, random_state=None):
+def compare_id_columns(df1, df2):
     """
-    Performs a stratified split of a dataset while ensuring all observations of an obligor stay together.
+    Compares ID columns of two DataFrames and creates a matrix showing the count of shared values.
+    
+    This function converts all ID values to strings to handle different datatypes before comparison.
 
-    Parameters:
-    - df: Pandas DataFrame containing the data.
-    - target_col: Name of the binary target column.
-    - obligor_col: Name of the column representing the obligor ID.
-    - test_size: Proportion of the dataset to be used for testing.
-    - random_state: Random seed for reproducibility.
+    Args:
+        df1 (pd.DataFrame): First DataFrame with ID columns.
+        df2 (pd.DataFrame): Second DataFrame with ID columns.
 
     Returns:
-    - train_df: Training dataset.
-    - test_df: Testing dataset.
+        pd.DataFrame: A matrix where rows are df1 columns, columns are df2 columns, and values are shared ID counts.
     """
-    obligor_groups = df.groupby(obligor_col)[target_col].first()  # Get target per obligor
-    train_obligors, test_obligors = train_test_split(
-        obligor_groups.index,
-        test_size=test_size,
-        stratify=obligor_groups,  # Stratify on target variable
-        random_state=random_state
-    )
+    id_cols_df1 = df1.columns  # ID columns from df1
+    id_cols_df2 = df2.columns  # ID columns from df2
 
-    train_df = df[df[obligor_col].isin(train_obligors)].copy()
-    test_df = df[df[obligor_col].isin(test_obligors)].copy()
+    # Create an empty results matrix
+    match_matrix = pd.DataFrame(index=id_cols_df1, columns=id_cols_df2, dtype=int)
 
-    return train_df, test_df
+    for col1 in id_cols_df1:
+        # Convert values to strings and remove NaNs
+        set1 = set(df1[col1].dropna().astype(str))  
+        for col2 in id_cols_df2:
+            set2 = set(df2[col2].dropna().astype(str))  # Convert to string
+            match_matrix.loc[col1, col2] = len(set1 & set2)  # Count common IDs
 
-# Generate sample data
-np.random.seed(42)
-num_obligors = 100
-num_observations = 1000
+    return match_matrix
 
-df = pd.DataFrame({
-    'obligor_id': np.random.randint(1, num_obligors + 1, num_observations),  # 100 unique obligors
-    'A': np.random.randn(num_observations),  # Feature column A
-    'target': np.random.choice([0, 1], size=num_observations, p=[0.7, 0.3])  # Binary target (70% zeros, 30% ones)
+# Example DataFrames with mixed data types
+df1 = pd.DataFrame({
+    'id_A': [1, 2, 3, '4', '5.0'],  # Integers and strings
+    'id_B': [10, 20, '30', 40.0, '50']  # Mixed types
 })
 
-# Lists to store means of column A for train and test sets
-train_means = []
-test_means = []
+df2 = pd.DataFrame({
+    'id_X': ['3', 4, 5.0, '6', '7'],  # Some values as strings
+    'id_Y': [30.0, '40', '50', 60, 70]  # Floats and strings
+})
 
-# Run the stratified split 100 times and calculate means
-for i in range(100):
-    train_df, test_df = stratified_split_by_obligor(df, target_col='target', obligor_col='obligor_id', test_size=0.3, random_state=i)
-    
-    train_means.append(train_df['A'].mean())  # Store train mean
-    test_means.append(test_df['A'].mean())  # Store test mean
+# Run comparison function
+match_matrix = compare_id_columns(df1, df2)
 
-# Plot the distributions of means
-plt.figure(figsize=(10, 5))
-sns.kdeplot(train_means, label='Train Mean (A)', fill=True, color='blue', alpha=0.5)
-sns.kdeplot(test_means, label='Test Mean (A)', fill=True, color='red', alpha=0.5)
-plt.axvline(np.mean(train_means), color='blue', linestyle='dashed', label=f'Train Mean: {np.mean(train_means):.3f}')
-plt.axvline(np.mean(test_means), color='red', linestyle='dashed', label=f'Test Mean: {np.mean(test_means):.3f}')
-plt.legend()
-plt.title("Distribution of Column 'A' Mean Over 100 Train/Test Splits")
-plt.xlabel("Mean of Column 'A'")
-plt.ylabel("Density")
-plt.show()
+# Display result
+print(match_matrix)
