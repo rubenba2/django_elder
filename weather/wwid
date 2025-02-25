@@ -1,46 +1,26 @@
-import pandas as pd
+    rows = []  # List to store matched row pairs
 
-def compare_id_columns(df1, df2):
-    """
-    Compares ID columns of two DataFrames and creates a matrix showing the count of shared values.
-    
-    This function converts all ID values to strings to handle different datatypes before comparison.
+    # Iterate over the matrix
+    for col1 in match_matrix.index:  # Rows (df1 ID columns)
+        for col2 in match_matrix.columns:  # Columns (df2 ID columns)
+            matched_ids = match_matrix.at[col1, col2]  # Get matched ID list
+            
+            if matched_ids:  # If there are matched values
+                for match_id in matched_ids:
+                    # Retrieve matching rows from df1 and df2
+                    rows_df1 = df1[df1[col1].astype(str) == match_id]
+                    rows_df2 = df2[df2[col2].astype(str) == match_id]
 
-    Args:
-        df1 (pd.DataFrame): First DataFrame with ID columns.
-        df2 (pd.DataFrame): Second DataFrame with ID columns.
+                    # Store the matched pairs in df3
+                    for _, row_df1 in rows_df1.iterrows():
+                        for _, row_df2 in rows_df2.iterrows():
+                            rows.append({
+                                'df1_id_col': col1,
+                                'df2_id_col': col2,
+                                'matched_id': match_id,
+                                'df1_row': row_df1.to_dict(),  # Store full row from df1
+                                'df2_row': row_df2.to_dict()   # Store full row from df2
+                            })
 
-    Returns:
-        pd.DataFrame: A matrix where rows are df1 columns, columns are df2 columns, and values are shared ID counts.
-    """
-    id_cols_df1 = df1.columns  # ID columns from df1
-    id_cols_df2 = df2.columns  # ID columns from df2
-
-    # Create an empty results matrix
-    match_matrix = pd.DataFrame(index=id_cols_df1, columns=id_cols_df2, dtype=int)
-
-    for col1 in id_cols_df1:
-        # Convert values to strings and remove NaNs
-        set1 = set(df1[col1].dropna().astype(str))  
-        for col2 in id_cols_df2:
-            set2 = set(df2[col2].dropna().astype(str))  # Convert to string
-            match_matrix.loc[col1, col2] = len(set1 & set2)  # Count common IDs
-
-    return match_matrix
-
-# Example DataFrames with mixed data types
-df1 = pd.DataFrame({
-    'id_A': [1, 2, 3, '4', '5.0'],  # Integers and strings
-    'id_B': [10, 20, '30', 40.0, '50']  # Mixed types
-})
-
-df2 = pd.DataFrame({
-    'id_X': ['3', 4, 5.0, '6', '7'],  # Some values as strings
-    'id_Y': [30.0, '40', '50', 60, 70]  # Floats and strings
-})
-
-# Run comparison function
-match_matrix = compare_id_columns(df1, df2)
-
-# Display result
-print(match_matrix)
+    # Convert to DataFrame
+    df3 = pd.DataFrame(rows)    
