@@ -1,26 +1,48 @@
-    rows = []  # List to store matched row pairs
+import pandas as pd
+from rapidfuzz.process import extractOne
 
-    # Iterate over the matrix
-    for col1 in match_matrix.index:  # Rows (df1 ID columns)
-        for col2 in match_matrix.columns:  # Columns (df2 ID columns)
-            matched_ids = match_matrix.at[col1, col2]  # Get matched ID list
+# Sample DataFrame
+data = {
+    'id': [1, 2, 3, 4, 5],
+    'text': ["apple pie", "apple-pie", "banana bread", "bananas bread", "cherry tart"]
+}
+
+df = pd.DataFrame(data)
+
+# Function to group similar text
+def find_similar_groups(df, threshold=80):
+    groups = []
+    assigned = set()
+
+    for i, text in enumerate(df['text']):
+        if i in assigned:
+            continue
+        
+        group = [i]  # Start a new group
+        assigned.add(i)
+
+        for j, other_text in enumerate(df['text']):
+            if j in assigned:
+                continue
             
-            if matched_ids:  # If there are matched values
-                for match_id in matched_ids:
-                    # Retrieve matching rows from df1 and df2
-                    rows_df1 = df1[df1[col1].astype(str) == match_id]
-                    rows_df2 = df2[df2[col2].astype(str) == match_id]
+            # Compute similarity
+            match_score = extractOne(other_text, [text])[1]
+            if match_score >= threshold:  # If similarity is high enough
+                group.append(j)
+                assigned.add(j)
+        
+        groups.append(group)
 
-                    # Store the matched pairs in df3
-                    for _, row_df1 in rows_df1.iterrows():
-                        for _, row_df2 in rows_df2.iterrows():
-                            rows.append({
-                                'df1_id_col': col1,
-                                'df2_id_col': col2,
-                                'matched_id': match_id,
-                                'df1_row': row_df1.to_dict(),  # Store full row from df1
-                                'df2_row': row_df2.to_dict()   # Store full row from df2
-                            })
+    # Assign group labels
+    group_map = {}
+    for group_id, indices in enumerate(groups):
+        for idx in indices:
+            group_map[idx] = group_id
 
-    # Convert to DataFrame
-    df3 = pd.DataFrame(rows)    
+    df['group'] = df.index.map(group_map)
+    return df
+
+# Group rows by similarity
+df_grouped = find_similar_groups(df, threshold=80)
+
+print(df_grouped)
