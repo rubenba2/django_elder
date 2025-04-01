@@ -1,64 +1,25 @@
-Sub SplitDataIntoSheets()
-    Dim ws As Worksheet, newWs As Worksheet
-    Dim colasdfCol As Range, cell As Range
-    Dim uniqueValues As Object
-    Dim lastRow As Long, headerRow As Range
-    Dim targetSheetName As String
-    Dim invalidChars As Variant
-    Dim i As Integer
-    
-    ' Set the source worksheet (change as needed)
-    Set ws = ThisWorkbook.Sheets("Sheet1") ' Change "Sheet1" if needed
-    
-    ' Find the last row of data
-    lastRow = ws.Cells(ws.Rows.Count, "AP").End(xlUp).Row
-    
-    ' Set the column with "colasdf" (now column AP)
-    Set colasdfCol = ws.Range("AP2:AP" & lastRow) ' "colasdf" is now in column AP
-    
-    ' Create a dictionary to store unique values
-    Set uniqueValues = CreateObject("Scripting.Dictionary")
-    
-    ' Identify unique values in "colasdf" column
-    For Each cell In colasdfCol
-        If Not uniqueValues.exists(cell.Value) And cell.Value <> "" Then
-            uniqueValues.Add cell.Value, Nothing
-        End If
-    Next cell
-    
-    ' Copy header row
-    Set headerRow = ws.Rows(1)
-    
-    ' List of invalid characters for sheet names
-    invalidChars = Array("\", "/", "*", "[", "]", ":", "?")
-    
-    ' Loop through unique values and create separate sheets
-    For Each targetSheetName In uniqueValues.Keys
-        ' Remove invalid characters and truncate to 31 characters
-        For i = LBound(invalidChars) To UBound(invalidChars)
-            targetSheetName = Replace(targetSheetName, invalidChars(i), "")
-        Next i
-        If Len(targetSheetName) > 31 Then
-            targetSheetName = Left(targetSheetName, 31)
-        End If
+import pandas as pd
+
+# Load the Excel file
+file_path = 'your_file.xlsx'  # Update with your actual file path
+df = pd.read_excel(file_path, sheet_name='Sheet1')  # Change 'Sheet1' if needed
+
+# Specify the column to split by (assuming 'colasdf' is in column 'AP' - 41st column)
+col_to_split = 'AP'
+
+# Create a new Excel writer object
+with pd.ExcelWriter('output_split_data.xlsx', engine='openpyxl') as writer:
+    # Loop through each unique value in the 'colasdf' column
+    for value in df[col_to_split].unique():
+        # Filter the DataFrame for the current value
+        filtered_df = df[df[col_to_split] == value]
         
-        ' Create new sheet
-        On Error Resume Next
-        Set newWs = ThisWorkbook.Sheets(targetSheetName)
-        If newWs Is Nothing Then
-            Set newWs = ThisWorkbook.Sheets.Add
-            newWs.Name = targetSheetName
-        End If
-        On Error GoTo 0
+        # Sanitize sheet name: remove invalid characters and limit length to 31 characters
+        sheet_name = str(value)
+        sheet_name = sheet_name.translate(str.maketrans('', '', r'\/:*?"<>|'))  # Remove invalid chars
+        sheet_name = sheet_name[:31]  # Truncate to 31 characters if too long
         
-        ' Copy header to new sheet
-        headerRow.Copy Destination:=newWs.Rows(1)
-        
-        ' Copy rows matching the current value
-        ws.Range("AP1").CurrentRegion.AutoFilter Field:=42, Criteria1:=targetSheetName
-        ws.UsedRange.SpecialCells(xlCellTypeVisible).Copy Destination:=newWs.Range("A2")
-        ws.AutoFilterMode = False
-    Next targetSheetName
-    
-    MsgBox "Data has been split into separate sheets!", vbInformation
-End Sub
+        # Write the filtered data to the new sheet
+        filtered_df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+print("Data has been split into separate sheets!")
