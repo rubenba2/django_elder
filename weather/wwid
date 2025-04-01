@@ -3,7 +3,9 @@ Sub SplitDataIntoSheets()
     Dim colasdfCol As Range, cell As Range
     Dim uniqueValues As Object
     Dim lastRow As Long, headerRow As Range
-    Dim targetSheetName As Variant
+    Dim targetSheetName As String
+    Dim invalidChars As Variant
+    Dim i As Integer
     
     ' Set the source worksheet (change as needed)
     Set ws = ThisWorkbook.Sheets("Sheet1") ' Change "Sheet1" if needed
@@ -27,8 +29,19 @@ Sub SplitDataIntoSheets()
     ' Copy header row
     Set headerRow = ws.Rows(1)
     
+    ' List of invalid characters for sheet names
+    invalidChars = Array("\", "/", "*", "[", "]", ":", "?")
+    
     ' Loop through unique values and create separate sheets
     For Each targetSheetName In uniqueValues.Keys
+        ' Remove invalid characters and truncate to 31 characters
+        For i = LBound(invalidChars) To UBound(invalidChars)
+            targetSheetName = Replace(targetSheetName, invalidChars(i), "")
+        Next i
+        If Len(targetSheetName) > 31 Then
+            targetSheetName = Left(targetSheetName, 31)
+        End If
+        
         ' Create new sheet
         On Error Resume Next
         Set newWs = ThisWorkbook.Sheets(targetSheetName)
