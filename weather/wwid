@@ -4,13 +4,16 @@ import pandas as pd
 file_path = 'your_file.xlsx'  # Update with your actual file path
 df = pd.read_excel(file_path, sheet_name='Sheet1')  # Change 'Sheet1' if needed
 
-# Specify the column to split by (assuming 'colasdf' is in column 'AP' - 41st column)
-col_to_split = 'AP'
+# Ensure the column name is correctly capitalized and exists
+col_to_split = 'COLASDF'
+
+if col_to_split not in df.columns:
+    raise ValueError(f"Column '{col_to_split}' not found in the Excel file.")
 
 # Create a new Excel writer object
 with pd.ExcelWriter('output_split_data.xlsx', engine='openpyxl') as writer:
-    # Loop through each unique value in the 'colasdf' column
-    for value in df[col_to_split].unique():
+    # Loop through each unique value in the 'COLASDF' column
+    for value in df[col_to_split].dropna().unique():  # Drop NaN values to avoid errors
         # Filter the DataFrame for the current value
         filtered_df = df[df[col_to_split] == value]
         
