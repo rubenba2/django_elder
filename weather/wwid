@@ -1,48 +1,51 @@
-import pandas as pd
-from rapidfuzz.process import extractOne
-
-# Sample DataFrame
-data = {
-    'id': [1, 2, 3, 4, 5],
-    'text': ["apple pie", "apple-pie", "banana bread", "bananas bread", "cherry tart"]
-}
-
-df = pd.DataFrame(data)
-
-# Function to group similar text
-def find_similar_groups(df, threshold=80):
-    groups = []
-    assigned = set()
-
-    for i, text in enumerate(df['text']):
-        if i in assigned:
-            continue
+Sub SplitDataIntoSheets()
+    Dim ws As Worksheet, newWs As Worksheet
+    Dim colasdfCol As Range, cell As Range
+    Dim uniqueValues As Object
+    Dim lastRow As Long, headerRow As Range
+    Dim targetSheetName As String
+    
+    ' Set the source worksheet (change as needed)
+    Set ws = ThisWorkbook.Sheets("Sheet1") ' Change "Sheet1" if needed
+    
+    ' Find the last row of data
+    lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    
+    ' Set the column with "colasdf" (change column number if needed)
+    Set colasdfCol = ws.Range("A2:A" & lastRow) ' Assuming "colasdf" is in column A, adjust if necessary
+    
+    ' Create a dictionary to store unique values
+    Set uniqueValues = CreateObject("Scripting.Dictionary")
+    
+    ' Identify unique values in "colasdf" column
+    For Each cell In colasdfCol
+        If Not uniqueValues.exists(cell.Value) And cell.Value <> "" Then
+            uniqueValues.Add cell.Value, Nothing
+        End If
+    Next cell
+    
+    ' Copy header row
+    Set headerRow = ws.Rows(1)
+    
+    ' Loop through unique values and create separate sheets
+    For Each targetSheetName In uniqueValues.Keys
+        ' Create new sheet
+        On Error Resume Next
+        Set newWs = ThisWorkbook.Sheets(targetSheetName)
+        If newWs Is Nothing Then
+            Set newWs = ThisWorkbook.Sheets.Add
+            newWs.Name = targetSheetName
+        End If
+        On Error GoTo 0
         
-        group = [i]  # Start a new group
-        assigned.add(i)
-
-        for j, other_text in enumerate(df['text']):
-            if j in assigned:
-                continue
-            
-            # Compute similarity
-            match_score = extractOne(other_text, [text])[1]
-            if match_score >= threshold:  # If similarity is high enough
-                group.append(j)
-                assigned.add(j)
+        ' Copy header to new sheet
+        headerRow.Copy Destination:=newWs.Rows(1)
         
-        groups.append(group)
-
-    # Assign group labels
-    group_map = {}
-    for group_id, indices in enumerate(groups):
-        for idx in indices:
-            group_map[idx] = group_id
-
-    df['group'] = df.index.map(group_map)
-    return df
-
-# Group rows by similarity
-df_grouped = find_similar_groups(df, threshold=80)
-
-print(df_grouped)
+        ' Copy rows matching the current value
+        ws.Range("A1").CurrentRegion.AutoFilter Field:=1, Criteria1:=targetSheetName
+        ws.UsedRange.SpecialCells(xlCellTypeVisible).Copy Destination:=newWs.Range("A2")
+        ws.AutoFilterMode = False
+    Next targetSheetName
+    
+    MsgBox "Data has been split into separate sheets!", vbInformation
+End Sub
