@@ -3,16 +3,16 @@ Sub SplitDataIntoSheets()
     Dim colasdfCol As Range, cell As Range
     Dim uniqueValues As Object
     Dim lastRow As Long, headerRow As Range
-    Dim targetSheetName As String
+    Dim targetSheetName As Variant
     
     ' Set the source worksheet (change as needed)
     Set ws = ThisWorkbook.Sheets("Sheet1") ' Change "Sheet1" if needed
     
     ' Find the last row of data
-    lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    lastRow = ws.Cells(ws.Rows.Count, "AP").End(xlUp).Row
     
-    ' Set the column with "colasdf" (change column number if needed)
-    Set colasdfCol = ws.Range("A2:A" & lastRow) ' Assuming "colasdf" is in column A, adjust if necessary
+    ' Set the column with "colasdf" (now column AP)
+    Set colasdfCol = ws.Range("AP2:AP" & lastRow) ' "colasdf" is now in column AP
     
     ' Create a dictionary to store unique values
     Set uniqueValues = CreateObject("Scripting.Dictionary")
@@ -42,7 +42,7 @@ Sub SplitDataIntoSheets()
         headerRow.Copy Destination:=newWs.Rows(1)
         
         ' Copy rows matching the current value
-        ws.Range("A1").CurrentRegion.AutoFilter Field:=1, Criteria1:=targetSheetName
+        ws.Range("AP1").CurrentRegion.AutoFilter Field:=42, Criteria1:=targetSheetName
         ws.UsedRange.SpecialCells(xlCellTypeVisible).Copy Destination:=newWs.Range("A2")
         ws.AutoFilterMode = False
     Next targetSheetName
