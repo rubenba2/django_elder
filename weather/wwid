@@ -1,27 +1,60 @@
-from scipy.stats import binom_test
+import pandas as pd
+import numpy as np
+from scipy.stats import beta
 
-# Step 1: Total number of observations
-n = cohort_data.shape[0]
+# Set up container for results
+results = []
 
-# Step 2: Total number of observed defaults
-observed_defaults = cohort_data['def_flag'].sum()
+# Group by rating
+grouped = cohort_data.groupby('proposed_final_crr')
 
-# Step 3: Total expected defaults from predicted PDs
-expected_defaults = cohort_data['proposed_final_pd'].sum()
+for rating, group in grouped:
+    n = len(group)
+    d = group['fake_def'].sum()
+    avg_pd = group['proposed_final_pd'].mean()
 
-# Step 4: Convert expected defaults to expected default rate
-expected_default_rate = expected_defaults / n
+    # Jeffreys prior: a = 0.5, b = 0.5
+    alpha_post = d + 0.5
+    beta_post = n - d + 0.5
 
-# Step 5: Perform the binomial test
-p_value = binom_test(observed_defaults, n, expected_default_rate, alternative='two-sided')
+    # Bidirectional test (two-tailed)
+    lower = beta.ppf(0.025, alpha_post, beta_post)
+    upper = beta.ppf(0.975, alpha_post, beta_post)
+    if avg_pd < lower:
+        bidir_p = 2 * beta.cdf(avg_pd, alpha_post, beta_post)
+    elif avg_pd > upper:
+        bidir_p = 2 * (1 - beta.cdf(avg_pd, alpha_post, beta_post))
+    else:
+        bidir_p = 1.0
 
-print(f"Observed Defaults: {observed_defaults}")
-print(f"Expected Defaults (Sum of PDs): {expected_defaults:.2f}")
-print(f"Expected Default Rate: {expected_default_rate:.4f}")
-print(f"Binomial Test p-value: {p_value:.4f}")
+    # Unidirectional test (model overpredicting only)
+    unidir_p = 1 - beta.cdf(avg_pd, alpha_post, beta_post)
 
-# Optional interpretation
-if p_value < 0.05:
-    print("Result: Statistically significant difference — model may be miscalibrated.")
-else:
-    print("Result: No significant difference — model is calibrated to observed outcomes.")
+    # Result classification
+    def classify(p):
+        if p > 0.05:
+            return "aligned PD-ODR"
+        elif p > 0.01:
+            return "minor difference"
+        else:
+            return "major difference"
+
+    results.append({
+        'rating': rating,
+        'obligors': n,
+        'defaults': int(d),
+        'avg_pd': round(avg_pd, 4),
+        'unidir_p': round(unidir_p, 4),
+        'unidir_result': classify(unidir_p),
+        'bidir_p': round(bidir_p, 4),
+        'bidir_result': classify(bidir_p),
+    })
+
+# Convert to DataFrame
+calibration_table = pd.DataFrame(results)
+
+# Sort by rating (optional, if rating is ordered)
+calibration_table = calibration_table.sort_values(by='rating')
+
+# Display the table
+print(calibration_table.to_string(index=False))
