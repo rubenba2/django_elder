@@ -2,39 +2,40 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Assuming your data is in df with:
-# - 'mod_rat': Rating assigned by the model (numeric or categorical)
-# - 'mod_score': Predicted probability of default (continuous value)
+# Assuming your data is loaded into 'cohort_data' DataFrame
+# Columns: 
+# - 'proposed_final_pd': Predicted probability of default (continuous)
+# - 'proposed_final_crr': Rating assigned by the model (could be ordinal or numeric)
 # - 'def_flag': Actual default flag (binary, 1 = default, 0 = non-default)
 
-# Step 1: Calculate ln(PD) for the model
-df['ln_mod_score'] = np.log(df['mod_score'])
+# Step 1: Calculate ln(PD) for the model predictions
+cohort_data['ln_proposed_final_pd'] = np.log(cohort_data['proposed_final_pd'])
 
-# Step 2: Calculate Long Run Average Default Rate (average def_flag) for each rating
-long_run_avg_default_rate = df.groupby('mod_rat')['def_flag'].mean()
+# Step 2: Calculate Long Run Average Default Rate for each rating
+long_run_avg_default_rate = cohort_data.groupby('proposed_final_crr')['def_flag'].mean()
 
 # Step 3: Calculate ln(Long Run Average Default Rate) for each rating
-# Avoid taking the log of zero by adding a small constant to the default rate
+# Avoid taking the log of zero by replacing 0 with a small constant (1e-10)
 long_run_avg_default_rate_ln = np.log(long_run_avg_default_rate.replace(0, 1e-10))
 
-# Step 4: Create a scatter plot of ln(PD) vs. ln(Long Run Average Default Rate)
+# Step 4: Aggregate the predicted PD (ln(proposed_final_pd)) for each rating
+avg_ln_mod_score = cohort_data.groupby('proposed_final_crr')['ln_proposed_final_pd'].mean()
+
+# Step 5: Create a scatter plot of ln(PD) vs. ln(Long Run Average Default Rate)
 plt.figure(figsize=(10, 6))
 
-# Plot predicted PD (ln(mod_score)) against ratings
-# Aggregating predicted scores by rating
-avg_ln_mod_score = df.groupby('mod_rat')['ln_mod_score'].mean()
-
-# Scatter plot for predicted PD (ln(mod_score))
+# Plot predicted PD (ln(proposed_final_pd)) against ratings
 plt.scatter(avg_ln_mod_score.index, avg_ln_mod_score, label='ln(PD)', color='blue', marker='o')
 
 # Scatter plot for Long Run Average Default Rate (ln(avg_default_rate))
 plt.scatter(long_run_avg_default_rate_ln.index, long_run_avg_default_rate_ln, label='ln(Long Run Average Default Rate)', color='red', marker='x')
 
 # Labels and title
-plt.xlabel('Rating')
+plt.xlabel('Rating (proposed_final_crr)')
 plt.ylabel('Log of Probability of Default / Long Run Average Default Rate')
 plt.title('Log(PD) vs Log(Long Run Average Default Rate) by Rating')
 plt.legend(loc='upper left')
 plt.grid(True)
 
+# Show the plot
 plt.show()
