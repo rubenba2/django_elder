@@ -1,8 +1,33 @@
-print(f"Spearman Rank Correlation: {corr:.3f}")
-print(f"P-value: {p_value:.4f}")
+import pandas as pd
+from sklearn.metrics import roc_auc_score, roc_curve
+import numpy as np
+import matplotlib.pyplot as plt
 
-# Optional interpretation
-if p_value < 0.05:
-    print("Statistically significant correlation: Model has discriminatory power.")
-else:
-    print("No statistically significant correlation: Model may lack discriminatory power.")
+# Assuming your data is loaded into df with:
+# - 'def_flag': binary target (0 = no default, 1 = default)
+# - 'mod_score': continuous model score or PD (probability of default)
+
+# Step 1: Calculate AUROC
+y_true = df['def_flag']  # True labels (default or not)
+y_scores = df['mod_score']  # Predicted probabilities or continuous scores
+
+# AUROC calculation
+auroc = roc_auc_score(y_true, y_scores)
+gini = 2 * auroc - 1
+
+print(f"AUROC: {auroc:.3f}")
+print(f"Gini Coefficient: {gini:.3f}")
+
+# Step 2: Optional - Plot ROC curve for visualization
+fpr, tpr, thresholds = roc_curve(y_true, y_scores)
+
+plt.figure(figsize=(8, 6))
+plt.plot(fpr, tpr, color='blue', label=f'ROC curve (AUROC = {auroc:.3f})')
+plt.plot([0, 1], [0, 1], color='gray', linestyle='--')  # Diagonal line (no discrimination)
+plt.xlabel('False Positive Rate (FPR)')
+plt.ylabel('True Positive Rate (TPR)')
+plt.title('ROC Curve')
+plt.legend(loc="lower right")
+plt.show()
+
+
