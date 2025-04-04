@@ -1,28 +1,8 @@
-import pandas as pd
+print(f"Spearman Rank Correlation: {corr:.3f}")
+print(f"P-value: {p_value:.4f}")
 
-# Load the Excel file
-file_path = 'your_file.xlsx'  # Update with your actual file path
-df = pd.read_excel(file_path, sheet_name='Sheet1')  # Change 'Sheet1' if needed
-
-# Ensure the column name is correctly capitalized and exists
-col_to_split = 'COLASDF'
-
-if col_to_split not in df.columns:
-    raise ValueError(f"Column '{col_to_split}' not found in the Excel file.")
-
-# Create a new Excel writer object
-with pd.ExcelWriter('output_split_data.xlsx', engine='openpyxl') as writer:
-    # Loop through each unique value in the 'COLASDF' column
-    for value in df[col_to_split].dropna().unique():  # Drop NaN values to avoid errors
-        # Filter the DataFrame for the current value
-        filtered_df = df[df[col_to_split] == value]
-        
-        # Sanitize sheet name: remove invalid characters and limit length to 31 characters
-        sheet_name = str(value)
-        sheet_name = sheet_name.translate(str.maketrans('', '', r'\/:*?"<>|'))  # Remove invalid chars
-        sheet_name = sheet_name[:31]  # Truncate to 31 characters if too long
-        
-        # Write the filtered data to the new sheet
-        filtered_df.to_excel(writer, sheet_name=sheet_name, index=False)
-
-print("Data has been split into separate sheets!")
+# Optional interpretation
+if p_value < 0.05:
+    print("Statistically significant correlation: Model has discriminatory power.")
+else:
+    print("No statistically significant correlation: Model may lack discriminatory power.")
