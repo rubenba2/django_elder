@@ -1,37 +1,35 @@
 import pandas as pd
 import numpy as np
 
-def calculate_migration_matrix(df, period_months=12):
-    # Sort by gcdu_id and cohort_date to ensure proper order for tracking rating changes
-    df = df.sort_values(by=['gcdu_id', 'cohort_date'])
-
-    # Create a new column 'end_date' that shifts 'cohort_date' by 'period_months'
-    df['end_date'] = df['cohort_date'] + pd.DateOffset(months=period_months)
+def calculate_migration_shares(df, period_months=12):
+    # Calculate migration matrix (cross-tabulation)
+    migration_matrix = calculate_migration_matrix(df, period_months)
     
-    # Merge to get ratings at the 'end_date' for each obligor
-    migration_df = pd.merge(
-        df, df[['gcdu_id', 'proposed_final_crr', 'cohort_date']], 
-        left_on=['gcdu_id', 'end_date'], 
-        right_on=['gcdu_id', 'cohort_date'], 
-        suffixes=('_start', '_end'), 
-        how='inner'
-    )
+    # Total number of observations (sum of all entries in the matrix)
+    total_observations = migration_matrix.sum().sum()
+    
+    # Diagonal elements (no migration)
+    no_migration = np.trace(migration_matrix.values)
+    
+    # Percentages of migrations
+    migration_1_rating = migration_matrix.values[0:3, 0:3].sum()
+    migration_2_ratings = migration_matrix.values[0:2, 0:2].sum()
+    migration_3_or_more = migration_matrix.values.sum() - migration_1_rating - migration_2_ratings
+    
+    # Calculate percentages
+    percent_no_migration = no_migration / total_observations * 100
+    percent_1_rating = migration_1_rating / total_observations * 100
+    percent_2_ratings = migration_2_ratings / total_observations * 100
+    percent_3_or_more = migration_3_or_more / total_observations * 100
+    
+    # Create DataFrame for results
+    results = pd.DataFrame({
+        'Metric': ['No Migration', '1 Rating', '2 Ratings', '3 Ratings or more'],
+        'Share (%)': [percent_no_migration, percent_1_rating, percent_2_ratings, percent_3_or_more]
+    })
 
-    # Create a cross-tabulation (pivot table) for rating migrations
-    migration_matrix = pd.crosstab(migration_df['proposed_final_crr_start'], migration_df['proposed_final_crr_end'], 
-                                   normalize='index')
-
-    # Return the migration matrix
-    return migration_matrix
+    return results
 
 # Example usage:
-migration_matrix_12months = calculate_migration_matrix(cohort_data, period_months=12)
-migration_matrix_24months = calculate_migration_matrix(cohort_data, period_months=24)
-
-# Display migration matrix for 12 months
-print("Migration Matrix for 12 months:")
-print(migration_matrix_12months)
-
-# Display migration matrix for 24 months
-print("Migration Matrix for 24 months:")
-print(migration_matrix_24months)
+migration_shares_12months = calculate_migration_shares(cohort_data, period_months=12)
+print(migration_shares_12months)
