@@ -1,60 +1,18 @@
-import pandas as pd
-import numpy as np
-from scipy.stats import beta
+# Group by rating and calculate calibration stats
+calibration_summary = cohort_data.groupby('proposed_final_crr').agg(
+    obligors=('proposed_final_pd', 'count'),
+    avg_pd=('proposed_final_pd', 'mean'),
+    defaults=('DEFAULT_EVENT', 'sum')
+)
 
-# Set up container for results
-results = []
+# Calculate observed default rate
+calibration_summary['odr'] = calibration_summary['defaults'] / calibration_summary['obligors']
 
-# Group by rating
-grouped = cohort_data.groupby('proposed_final_crr')
+# Optional: round for cleaner display
+calibration_summary = calibration_summary.round({'avg_pd': 4, 'odr': 4})
 
-for rating, group in grouped:
-    n = len(group)
-    d = group['fake_def'].sum()
-    avg_pd = group['proposed_final_pd'].mean()
-
-    # Jeffreys prior: a = 0.5, b = 0.5
-    alpha_post = d + 0.5
-    beta_post = n - d + 0.5
-
-    # Bidirectional test (two-tailed)
-    lower = beta.ppf(0.025, alpha_post, beta_post)
-    upper = beta.ppf(0.975, alpha_post, beta_post)
-    if avg_pd < lower:
-        bidir_p = 2 * beta.cdf(avg_pd, alpha_post, beta_post)
-    elif avg_pd > upper:
-        bidir_p = 2 * (1 - beta.cdf(avg_pd, alpha_post, beta_post))
-    else:
-        bidir_p = 1.0
-
-    # Unidirectional test (model overpredicting only)
-    unidir_p = 1 - beta.cdf(avg_pd, alpha_post, beta_post)
-
-    # Result classification
-    def classify(p):
-        if p > 0.05:
-            return "aligned PD-ODR"
-        elif p > 0.01:
-            return "minor difference"
-        else:
-            return "major difference"
-
-    results.append({
-        'rating': rating,
-        'obligors': n,
-        'defaults': int(d),
-        'avg_pd': round(avg_pd, 4),
-        'unidir_p': round(unidir_p, 4),
-        'unidir_result': classify(unidir_p),
-        'bidir_p': round(bidir_p, 4),
-        'bidir_result': classify(bidir_p),
-    })
-
-# Convert to DataFrame
-calibration_table = pd.DataFrame(results)
-
-# Sort by rating (optional, if rating is ordered)
-calibration_table = calibration_table.sort_values(by='rating')
+# Reset index if you want a flat table
+calibration_summary = calibration_summary.reset_index()
 
 # Display the table
-print(calibration_table.to_string(index=False))
+print(calibration_summary)
