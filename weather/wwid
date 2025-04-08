@@ -1,18 +1,25 @@
-# Group by rating and calculate calibration stats
-calibration_summary = cohort_data.groupby('proposed_final_crr').agg(
-    obligors=('proposed_final_pd', 'count'),
-    avg_pd=('proposed_final_pd', 'mean'),
-    defaults=('DEFAULT_EVENT', 'sum')
-)
+import matplotlib.pyplot as plt
 
-# Calculate observed default rate
-calibration_summary['odr'] = calibration_summary['defaults'] / calibration_summary['obligors']
+# Get the unique values for the bins (same for both columns)
+unique_values = sorted(cohort_data['proposed_final_crr'].unique())
 
-# Optional: round for cleaner display
-calibration_summary = calibration_summary.round({'avg_pd': 4, 'odr': 4})
+# Plotting
+plt.figure(figsize=(12, 6))
 
-# Reset index if you want a flat table
-calibration_summary = calibration_summary.reset_index()
+# Plot histogram for 'proposed_final_crr' and 'CRR'
+plt.hist(cohort_data['proposed_final_crr'], bins=len(unique_values), alpha=0.5, label='proposed_final_crr', color='blue')
+plt.hist(cohort_data['CRR'], bins=len(unique_values), alpha=0.5, label='CRR', color='orange')
 
-# Display the table
-print(calibration_summary)
+# Titles and labels
+plt.title('Histogram of Frequencies of Proposed Final CRR and CRR')
+plt.xlabel('Rating')
+plt.ylabel('Frequency')
+
+# Add legend
+plt.legend()
+
+# Show grid
+plt.grid(True)
+
+# Show the plot
+plt.show()
