@@ -1,50 +1,50 @@
 import pandas as pd
 import numpy as np
 
-def calculate_migration_shares(df, period_months=12):
-    # Calculate migration matrix (cross-tabulation)
-    migration_matrix = calculate_migration_matrix(df, period_months)
-    
-    # Total number of observations (sum of all entries in the matrix)
-    total_observations = migration_matrix.sum().sum()
-    
-    # Diagonal elements (no migration)
-    no_migration = np.trace(migration_matrix.values)
+def migration_percentages(df, period_months=12):
+    # Ensure 'cohort_date' is in datetime format
+    df['cohort_date'] = pd.to_datetime(df['cohort_date'], errors='coerce')
 
-    # Initialize migration counters
-    migration_1_notch = 0
-    migration_2_notches = 0
-    migration_3_or_more = 0
+    # Get the current date (as string, converted to datetime)
+    now = pd.to_datetime('today')
     
-    # Loop through the matrix to calculate 1-notch, 2-notch and 3+ migrations
-    for i in range(len(migration_matrix.index)):
-        # 1-notch migration (adjacent ratings)
-        if i < len(migration_matrix.index) - 1:  # Check if there's an adjacent rating (i to i+1)
-            migration_1_notch += migration_matrix.iloc[i, i+1]  # Transition from i to i+1
-            migration_1_notch += migration_matrix.iloc[i+1, i]  # Transition from i+1 to i
+    # Define the end date (12 months after cohort_date)
+    df['end_date'] = df['cohort_date'] + pd.DateOffset(months=period_months)
+
+    # Merge to get the ratings at the 'cohort_date' and the 'end_date' (current date)
+    migration_df = pd.merge(
+        df, df[['gcdu_id', 'proposed_final_crr', 'cohort_date']], 
+        left_on=['gcdu_id', 'end_date'], 
+        right_on=['gcdu_id', 'cohort_date'], 
+        suffixes=('_start', '_end'), 
+        how='inner'
+    )
+
+    # Compare the ratings at cohort_date and the end_date
+    migration_df['migration_direction'] = np.where(
+        migration_df['proposed_final_crr_start'] < migration_df['proposed_final_crr_end'], 'Higher',
+        np.where(migration_df['proposed_final_crr_start'] > migration_df['proposed_final_crr_end'], 'Lower', 'No Change')
+    )
+
+    # For each month in the cohort_date, calculate the percentage of migrations
+    migration_percentages = []
+    for month in pd.date_range(migration_df['cohort_date'].min(), now, freq='MS'):  # Start of each month
+        # Filter for observations in this month
+        month_data = migration_df[migration_df['cohort_date'] == month]
         
-        # 2-notch migration (ratings two notches apart)
-        if i < len(migration_matrix.index) - 2:  # Check if there's a 2-notch migration (i to i+2)
-            migration_2_notches += migration_matrix.iloc[i, i+2]  # Transition from i to i+2
-            migration_2_notches += migration_matrix.iloc[i+2, i]  # Transition from i+2 to i
+        if len(month_data) > 0:
+            # Calculate the percentage migrating up, down, or no change
+            total_obs = len(month_data)
+            higher_percent = (month_data['migration_direction'] == 'Higher').sum() / total_obs * 100
+            lower_percent = (month_data['migration_direction'] == 'Lower').sum() / total_obs * 100
 
-    # 3 or more notch migrations: sum all remaining migrations
-    migration_3_or_more = migration_matrix.sum().sum() - no_migration - migration_1_notch - migration_2_notches
+            migration_percentages.append([month.strftime('%Y-%m'), higher_percent, lower_percent])
     
-    # Calculate percentages
-    percent_no_migration = no_migration / total_observations * 100
-    percent_1_notch = migration_1_notch / total_observations * 100
-    percent_2_notches = migration_2_notches / total_observations * 100
-    percent_3_or_more = migration_3_or_more / total_observations * 100
-    
-    # Create DataFrame for results
-    results = pd.DataFrame({
-        'Metric': ['No Migration', '1 Notch Migration', '2 Notch Migrations', '3 or More Notch Migrations'],
-        'Share (%)': [percent_no_migration, percent_1_notch, percent_2_notches, percent_3_or_more]
-    })
+    # Convert the results to a DataFrame
+    migration_percentages_df = pd.DataFrame(migration_percentages, columns=['Month', 'Migrated Higher (%)', 'Migrated Lower (%)'])
 
-    return results
+    return migration_percentages_df
 
 # Example usage:
-migration_shares_12months = calculate_migration_shares(cohort_data, period_months=12)
-print(migration_shares_12months)
+migration_shares = migration_percentages(cohort_data, period_months=12)
+print(migration_shares)
