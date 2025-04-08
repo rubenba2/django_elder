@@ -1,40 +1,37 @@
-import matplotlib.pyplot as plt
+import pandas as pd
 import numpy as np
 
-# Get the unique values of 'proposed_final_crr' and 'CRR'
-unique_values = sorted(cohort_data['proposed_final_crr'].unique())  # Assuming 'proposed_final_crr' and 'CRR' have the same unique values
+def calculate_migration_matrix(df, period_months=12):
+    # Sort by gcdu_id and cohort_date to ensure proper order for tracking rating changes
+    df = df.sort_values(by=['gcdu_id', 'cohort_date'])
 
-# Create the histogram for both variables (use 'density' to compare frequencies)
-counts_proposed_final_crr = cohort_data['proposed_final_crr'].value_counts().sort_index()
-counts_CRR = cohort_data['CRR'].value_counts().sort_index()
+    # Create a new column 'end_date' that shifts 'cohort_date' by 'period_months'
+    df['end_date'] = df['cohort_date'] + pd.DateOffset(months=period_months)
+    
+    # Merge to get ratings at the 'end_date' for each obligor
+    migration_df = pd.merge(
+        df, df[['gcdu_id', 'proposed_final_crr', 'cohort_date']], 
+        left_on=['gcdu_id', 'end_date'], 
+        right_on=['gcdu_id', 'cohort_date'], 
+        suffixes=('_start', '_end'), 
+        how='inner'
+    )
 
-# Create the figure and axis for plotting
-fig, ax = plt.subplots(figsize=(12, 6))
+    # Create a cross-tabulation (pivot table) for rating migrations
+    migration_matrix = pd.crosstab(migration_df['proposed_final_crr_start'], migration_df['proposed_final_crr_end'], 
+                                   normalize='index')
 
-# Set the bar width (to make bars next to each other)
-bar_width = 0.35
+    # Return the migration matrix
+    return migration_matrix
 
-# Define the positions of the bars on the x-axis for each variable
-positions = np.arange(len(unique_values))
+# Example usage:
+migration_matrix_12months = calculate_migration_matrix(cohort_data, period_months=12)
+migration_matrix_24months = calculate_migration_matrix(cohort_data, period_months=24)
 
-# Plot the first histogram for 'proposed_final_crr'
-ax.bar(positions - bar_width / 2, counts_proposed_final_crr, width=bar_width, label='proposed_final_crr', color='b')
+# Display migration matrix for 12 months
+print("Migration Matrix for 12 months:")
+print(migration_matrix_12months)
 
-# Plot the second histogram for 'CRR'
-ax.bar(positions + bar_width / 2, counts_CRR, width=bar_width, label='CRR', color='r')
-
-# Customize the x-axis (showing the unique values as labels)
-ax.set_xticks(positions)
-ax.set_xticklabels(unique_values, rotation=45)
-
-# Add labels and title
-ax.set_xlabel('Rating Values')
-ax.set_ylabel('Frequency')
-ax.set_title('Comparison of Frequencies for proposed_final_crr and CRR')
-
-# Add legend
-ax.legend()
-
-# Display the plot
-plt.tight_layout()
-plt.show()
+# Display migration matrix for 24 months
+print("Migration Matrix for 24 months:")
+print(migration_matrix_24months)
