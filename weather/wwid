@@ -1,25 +1,40 @@
 import matplotlib.pyplot as plt
+import numpy as np
 
-# Get the unique values for the bins (same for both columns)
-unique_values = sorted(cohort_data['proposed_final_crr'].unique())
+# Get the unique values of 'proposed_final_crr' and 'CRR'
+unique_values = sorted(cohort_data['proposed_final_crr'].unique())  # Assuming 'proposed_final_crr' and 'CRR' have the same unique values
 
-# Plotting
-plt.figure(figsize=(12, 6))
+# Create the histogram for both variables (use 'density' to compare frequencies)
+counts_proposed_final_crr = cohort_data['proposed_final_crr'].value_counts().sort_index()
+counts_CRR = cohort_data['CRR'].value_counts().sort_index()
 
-# Plot histogram for 'proposed_final_crr' and 'CRR'
-plt.hist(cohort_data['proposed_final_crr'], bins=len(unique_values), alpha=0.5, label='proposed_final_crr', color='blue')
-plt.hist(cohort_data['CRR'], bins=len(unique_values), alpha=0.5, label='CRR', color='orange')
+# Create the figure and axis for plotting
+fig, ax = plt.subplots(figsize=(12, 6))
 
-# Titles and labels
-plt.title('Histogram of Frequencies of Proposed Final CRR and CRR')
-plt.xlabel('Rating')
-plt.ylabel('Frequency')
+# Set the bar width (to make bars next to each other)
+bar_width = 0.35
+
+# Define the positions of the bars on the x-axis for each variable
+positions = np.arange(len(unique_values))
+
+# Plot the first histogram for 'proposed_final_crr'
+ax.bar(positions - bar_width / 2, counts_proposed_final_crr, width=bar_width, label='proposed_final_crr', color='b')
+
+# Plot the second histogram for 'CRR'
+ax.bar(positions + bar_width / 2, counts_CRR, width=bar_width, label='CRR', color='r')
+
+# Customize the x-axis (showing the unique values as labels)
+ax.set_xticks(positions)
+ax.set_xticklabels(unique_values, rotation=45)
+
+# Add labels and title
+ax.set_xlabel('Rating Values')
+ax.set_ylabel('Frequency')
+ax.set_title('Comparison of Frequencies for proposed_final_crr and CRR')
 
 # Add legend
-plt.legend()
+ax.legend()
 
-# Show grid
-plt.grid(True)
-
-# Show the plot
+# Display the plot
+plt.tight_layout()
 plt.show()
