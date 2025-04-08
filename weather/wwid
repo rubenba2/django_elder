@@ -10,22 +10,37 @@ def calculate_migration_shares(df, period_months=12):
     
     # Diagonal elements (no migration)
     no_migration = np.trace(migration_matrix.values)
+
+    # Initialize migration counters
+    migration_1_notch = 0
+    migration_2_notches = 0
+    migration_3_or_more = 0
     
-    # Percentages of migrations
-    migration_1_rating = migration_matrix.values[0:3, 0:3].sum()
-    migration_2_ratings = migration_matrix.values[0:2, 0:2].sum()
-    migration_3_or_more = migration_matrix.values.sum() - migration_1_rating - migration_2_ratings
+    # Loop through the matrix to calculate 1-notch, 2-notch and 3+ migrations
+    for i in range(len(migration_matrix.index)):
+        # 1-notch migration (adjacent ratings)
+        if i < len(migration_matrix.index) - 1:  # Check if there's an adjacent rating (i to i+1)
+            migration_1_notch += migration_matrix.iloc[i, i+1]  # Transition from i to i+1
+            migration_1_notch += migration_matrix.iloc[i+1, i]  # Transition from i+1 to i
+        
+        # 2-notch migration (ratings two notches apart)
+        if i < len(migration_matrix.index) - 2:  # Check if there's a 2-notch migration (i to i+2)
+            migration_2_notches += migration_matrix.iloc[i, i+2]  # Transition from i to i+2
+            migration_2_notches += migration_matrix.iloc[i+2, i]  # Transition from i+2 to i
+
+    # 3 or more notch migrations: sum all remaining migrations
+    migration_3_or_more = migration_matrix.sum().sum() - no_migration - migration_1_notch - migration_2_notches
     
     # Calculate percentages
     percent_no_migration = no_migration / total_observations * 100
-    percent_1_rating = migration_1_rating / total_observations * 100
-    percent_2_ratings = migration_2_ratings / total_observations * 100
+    percent_1_notch = migration_1_notch / total_observations * 100
+    percent_2_notches = migration_2_notches / total_observations * 100
     percent_3_or_more = migration_3_or_more / total_observations * 100
     
     # Create DataFrame for results
     results = pd.DataFrame({
-        'Metric': ['No Migration', '1 Rating', '2 Ratings', '3 Ratings or more'],
-        'Share (%)': [percent_no_migration, percent_1_rating, percent_2_ratings, percent_3_or_more]
+        'Metric': ['No Migration', '1 Notch Migration', '2 Notch Migrations', '3 or More Notch Migrations'],
+        'Share (%)': [percent_no_migration, percent_1_notch, percent_2_notches, percent_3_or_more]
     })
 
     return results
