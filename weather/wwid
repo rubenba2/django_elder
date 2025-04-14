@@ -5,9 +5,9 @@ def calculate_pai(df1, df2, variables, bins=5):
     results = []
 
     for var in variables:
-        # Check if variable is numeric
+        # Determine if numeric or categorical
         if pd.api.types.is_numeric_dtype(df1[var]):
-            combined = pd.concat([df1[[var]], df2[[var]]], ignore_index=True)
+            combined = pd.concat([df1[[var]], df2[[var]]])
             bin_edges = np.histogram_bin_edges(combined[var].dropna(), bins=bins)
 
             df1_dist = pd.cut(df1[var], bins=bin_edges, include_lowest=True).value_counts(normalize=True).sort_index()
@@ -16,23 +16,28 @@ def calculate_pai(df1, df2, variables, bins=5):
             df1_dist = df1[var].value_counts(normalize=True)
             df2_dist = df2[var].value_counts(normalize=True)
 
-        # Combine indexes to ensure all categories are included
-        all_categories = df1_dist.index.union(df2_dist.index)
-        df1_dist = df1_dist.reindex(all_categories, fill_value=0.0001)
-        df2_dist = df2_dist.reindex(all_categories, fill_value=0.0001)
+        # Union of all categories
+        all_bins = df1_dist.index.union(df2_dist.index)
+        df1_dist = df1_dist.reindex(all_bins, fill_value=0.0001)
+        df2_dist = df2_dist.reindex(all_bins, fill_value=0.0001)
 
-        # Calculate PAI
+        # PAI is max of Ai/Bi and Bi/Ai to detect any extreme misalignments
         ratio = df1_dist / df2_dist
-        pai = ratio.max()
+        inv_ratio = df2_dist / df1_dist
+        pai = max(ratio.max(), inv_ratio.max())
 
-        # Categorize PAI
+        # Classify
         if pai < 1.1:
-            status = 'Green'
+            status = "Green"
         elif pai < 1.5:
-            status = 'Amber'
+            status = "Amber"
         else:
-            status = 'Red'
+            status = "Red"
 
-        results.append({'Variable': var, 'PAI': round(pai, 2), 'Status': status})
+        results.append({
+            'Variable': var,
+            'PAI': round(pai, 2),
+            'Status': status
+        })
 
     return pd.DataFrame(results)
