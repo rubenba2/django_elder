@@ -1,40 +1,38 @@
-
 import pandas as pd
 import numpy as np
 
-def calculate_psi(df1, df2, variables, bins=5):
+def calculate_pai(df1, df2, variables, bins=5):
     results = []
 
     for var in variables:
         # Check if variable is numeric
         if pd.api.types.is_numeric_dtype(df1[var]):
-            # Define bin edges based on combined data
             combined = pd.concat([df1[[var]], df2[[var]]], ignore_index=True)
             bin_edges = np.histogram_bin_edges(combined[var].dropna(), bins=bins)
 
             df1_dist = pd.cut(df1[var], bins=bin_edges, include_lowest=True).value_counts(normalize=True).sort_index()
             df2_dist = pd.cut(df2[var], bins=bin_edges, include_lowest=True).value_counts(normalize=True).sort_index()
         else:
-            # Categorical variable
             df1_dist = df1[var].value_counts(normalize=True)
             df2_dist = df2[var].value_counts(normalize=True)
 
-        # Align both distributions to have the same bins/categories
+        # Combine indexes to ensure all categories are included
         all_categories = df1_dist.index.union(df2_dist.index)
         df1_dist = df1_dist.reindex(all_categories, fill_value=0.0001)
         df2_dist = df2_dist.reindex(all_categories, fill_value=0.0001)
 
-        # Calculate PSI for the variable
-        psi = np.sum((df1_dist - df2_dist) * np.log(df1_dist / df2_dist))
+        # Calculate PAI
+        ratio = df1_dist / df2_dist
+        pai = ratio.max()
 
-        # Color categorization
-        if psi < 0.10:
+        # Categorize PAI
+        if pai < 1.1:
             status = 'Green'
-        elif psi < 0.25:
+        elif pai < 1.5:
             status = 'Amber'
         else:
             status = 'Red'
 
-        results.append({'Variable': var, 'PSI': round(psi * 100, 2), 'Status': status})
+        results.append({'Variable': var, 'PAI': round(pai, 2), 'Status': status})
 
     return pd.DataFrame(results)
