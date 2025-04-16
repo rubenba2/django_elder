@@ -1,38 +1,43 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 
-def calculate_z_stats_for_crr_groups(df, group_var='CRR_group', default_var='DEFAULT_EVENT'):
-    # Sort CRR groups
-    groups = sorted(df[group_var].unique())
+def calculate_herfindahl_index_ECB(df, rating_var='CRR', default_threshold=7.1):
+    # Step 1. Filter out default exposures.
+    # Non-default exposures: ratings greater than or equal to default_threshold.
+    non_default_df = df[df[rating_var] >= default_threshold]
     
-    # Calculate default rate and variance for each group
-    stats = []
-    for group in groups:
-        sub_df = df[df[group_var] == group]
-        n = len(sub_df)
-        dr = sub_df[default_var].mean()
-        var = dr * (1 - dr) / n if n > 0 else np.nan
-        stats.append({'group': group, 'n': n, 'dr': dr, 'var': var})
-
-    stats_df = pd.DataFrame(stats)
+    # Step 2. Calculate the relative frequencies of each rating grade.
+    # Count exposures per grade.
+    counts = non_default_df[rating_var].value_counts()
     
-    # Calculate Z statistics for adjacent groups
-    z_stats = []
-    for i in range(1, len(stats_df)):
-        dr_i = stats_df.loc[i, 'dr']
-        dr_prev = stats_df.loc[i - 1, 'dr']
-        var_sum = stats_df.loc[i, 'var'] + stats_df.loc[i - 1, 'var']
-        z = (dr_i - dr_prev) / np.sqrt(var_sum) if var_sum > 0 else np.nan
-        z_stats.append({
-            'Group i-1': stats_df.loc[i - 1, 'group'],
-            'Group i': stats_df.loc[i, 'group'],
-            'DR i-1': dr_prev,
-            'DR i': dr_i,
-            'Z-stat': z
-        })
+    # Total number of non-default observations.
+    total = counts.sum()
+    
+    # Relative frequency for each rating grade
+    R = counts / total
+    
+    # Step 3. K: number of distinct rating grades
+    K = len(R)
+    
+    if K == 0:
+        raise ValueError("No non-default exposures available to calculate HI.")
+    
+    # Step 4. Calculate the coefficient of variation (CV)
+    # For an equally distributed case, each grade frequency would be 1/K.
+    # Compute sum_{i=1}^{K} (R_i - 1/K)^2
+    squared_diff = (R - 1/K) ** 2
+    sum_squared_diff = squared_diff.sum()
+    
+    CV = np.sqrt(K * sum_squared_diff)
+    
+    # Step 5. Calculate the Herfindahl Index (HI)
+    # Using: HI = 1 + log((CV^2 + 1)/K) / log(K)
+    # (log here is natural logarithm, i.e. ln)
+    HI = 1 + np.log((CV**2 + 1) / K) / np.log(K)
+    
+    return HI
 
-    return pd.DataFrame(z_stats)
-
-# Example usage
-z_results = calculate_z_stats_for_crr_groups(chc_df)
-print(z_results)
+# Example usage:
+# Assuming chc_df is your DataFrame and CRR is the rating variable
+herfindahl_index = calculate_herfindahl_index_ECB(chc_df, rating_var='CRR', default_threshold=7.1)
+print(f"Herfindahl Index for non-default exposures (CRR >= 7.1): {herfindahl_index:.4f}")
