@@ -1,43 +1,79 @@
-import numpy as np
 import pandas as pd
+import numpy as np
+from scipy.stats import norm
 
-def calculate_herfindahl_index_ECB(df, rating_var='CRR', default_threshold=7.1):
-    # Step 1. Filter out default exposures.
-    # Non-default exposures: ratings greater than or equal to default_threshold.
-    non_default_df = df[df[rating_var] >= default_threshold]
+def calculate_z_stats_for_crr_groups(df, group_var='CRR_group', default_var='DEFAULT_EVENT', alpha=0.05):
+    """
+    Calculate Z-statistics comparing the LRA DR (default rates) between adjacent groups in an ordered categorical variable.
+    Additionally, return two DataFrames:
+      - heterogeneity_df: pairs with p-value < alpha (rejecting the null of homogeneity)
+      - homogeneity_df: pairs with p-value >= alpha (failing to reject homogeneity)
     
-    # Step 2. Calculate the relative frequencies of each rating grade.
-    # Count exposures per grade.
-    counts = non_default_df[rating_var].value_counts()
+    Parameters:
+      df : DataFrame containing the data.
+      group_var : Name of the ordered categorical group variable (e.g., 'CRR_group').
+      default_var : Name of the binary default variable (1 = default, 0 = non-default).
+      alpha : Significance level for splitting the tests.
     
-    # Total number of non-default observations.
-    total = counts.sum()
+    Returns:
+      heterogeneity_df, homogeneity_df : Two DataFrames with the test results.
+    """
     
-    # Relative frequency for each rating grade
-    R = counts / total
+    # Get the list of groups in order.
+    if pd.api.types.is_categorical_dtype(df[group_var]):
+        groups = df[group_var].cat.categories
+    else:
+        groups = sorted(df[group_var].unique())
     
-    # Step 3. K: number of distinct rating grades
-    K = len(R)
+    # Calculate the LRA DR (default rate) and the binomial variance for each group.
+    stats = []
+    for group in groups:
+        sub_df = df[df[group_var] == group]
+        n = len(sub_df)
+        dr = sub_df[default_var].mean()
+        # Under a binomial assumption, variance = p*(1-p)/n
+        var = dr * (1 - dr) / n if n > 0 else np.nan
+        stats.append({'group': group, 'n': n, 'dr': dr, 'var': var})
     
-    if K == 0:
-        raise ValueError("No non-default exposures available to calculate HI.")
+    stats_df = pd.DataFrame(stats)
     
-    # Step 4. Calculate the coefficient of variation (CV)
-    # For an equally distributed case, each grade frequency would be 1/K.
-    # Compute sum_{i=1}^{K} (R_i - 1/K)^2
-    squared_diff = (R - 1/K) ** 2
-    sum_squared_diff = squared_diff.sum()
+    # Calculate the two-sample Z-statistic for each adjacent group pair.
+    results_list = []
+    for i in range(1, len(stats_df)):
+        dr_i = stats_df.loc[i, 'dr']
+        dr_prev = stats_df.loc[i - 1, 'dr']
+        var_sum = stats_df.loc[i, 'var'] + stats_df.loc[i - 1, 'var']
+        # Compute Z-statistic only if the combined variance is positive.
+        z_stat = (dr_i - dr_prev) / np.sqrt(var_sum) if var_sum > 0 else np.nan
+        # Two-sided p-value from the standard normal distribution:
+        p_value = 2 * (1 - norm.cdf(abs(z_stat))) if not np.isnan(z_stat) else np.nan
+        
+        results_list.append({
+            'Group i-1': stats_df.loc[i - 1, 'group'],
+            'Group i': stats_df.loc[i, 'group'],
+            'DR i-1': dr_prev,
+            'DR i': dr_i,
+            'Z-stat': z_stat,
+            'p-value': p_value
+        })
     
-    CV = np.sqrt(K * sum_squared_diff)
+    z_df = pd.DataFrame(results_list)
     
-    # Step 5. Calculate the Herfindahl Index (HI)
-    # Using: HI = 1 + log((CV^2 + 1)/K) / log(K)
-    # (log here is natural logarithm, i.e. ln)
-    HI = 1 + np.log((CV**2 + 1) / K) / np.log(K)
+    # Split the results:
+    # Heterogeneity: p-value < alpha (reject H0: default rates are equal)
+    heterogeneity_df = z_df[z_df['p-value'] < alpha].reset_index(drop=True)
+    # Homogeneity: p-value >= alpha (fail to reject H0, i.e. default rates are not significantly different)
+    homogeneity_df = z_df[z_df['p-value'] >= alpha].reset_index(drop=True)
     
-    return HI
+    return heterogeneity_df, homogeneity_df
 
 # Example usage:
-# Assuming chc_df is your DataFrame and CRR is the rating variable
-herfindahl_index = calculate_herfindahl_index_ECB(chc_df, rating_var='CRR', default_threshold=7.1)
-print(f"Herfindahl Index for non-default exposures (CRR >= 7.1): {herfindahl_index:.4f}")
+
+# Suppose chc_df is your DataFrame, CRR_group is an ordered categorical variable,
+# and DEFAULT_EVENT is the binary default indicator.
+heterogeneity_df, homogeneity_df = calculate_z_stats_for_crr_groups(chc_df, group_var='CRR_group', default_var='DEFAULT_EVENT', alpha=0.05)
+
+print("Heterogeneity Results (Significant differences):")
+print(heterogeneity_df)
+print("\nHomogeneity Results (No significant difference):")
+print(homogeneity_df)
