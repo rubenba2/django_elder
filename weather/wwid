@@ -2,78 +2,120 @@ import pandas as pd
 import numpy as np
 from scipy.stats import norm
 
-def calculate_z_stats_for_crr_groups(df, group_var='CRR_group', default_var='DEFAULT_EVENT', alpha=0.05):
+def calculate_homogeneity_by_median(df, rating_var='CRR_group', default_var='DEFAULT_EVENT', score_var='score_var', alpha=0.05):
     """
-    Calculate Z-statistics comparing the LRA DR (default rates) between adjacent groups in an ordered categorical variable.
-    Additionally, return two DataFrames:
-      - heterogeneity_df: pairs with p-value < alpha (rejecting the null of homogeneity)
-      - homogeneity_df: pairs with p-value >= alpha (failing to reject homogeneity)
+    For each rating in `rating_var`, this function splits the observations into two groups using the median of `score_var`
+    as the threshold, calculates the long-run average default rates (LRA DR) for each group,
+    and then performs a two-sample Z-test to compare these rates.
     
     Parameters:
-      df : DataFrame containing the data.
-      group_var : Name of the ordered categorical group variable (e.g., 'CRR_group').
-      default_var : Name of the binary default variable (1 = default, 0 = non-default).
-      alpha : Significance level for splitting the tests.
-    
+      df          : DataFrame with the data.
+      rating_var  : The column name for the rating group (ordered categorical).
+      default_var : The binary default indicator column (1 = default, 0 = non-default).
+      score_var   : The continuous variable used to split the observations by its median.
+      alpha       : Significance level for the test (default=0.05).
+      
     Returns:
-      heterogeneity_df, homogeneity_df : Two DataFrames with the test results.
+      A DataFrame summarizing, for each rating in `rating_var`:
+          - Total number of observations.
+          - The median threshold for `score_var`.
+          - DR for observations with `score_var` ≤ median.
+          - DR for observations with `score_var` > median.
+          - The Z–statistic and corresponding two–sided p–value.
+          - A conclusion on homogeneity.
     """
+    results = []
     
-    # Get the list of groups in order.
-    if pd.api.types.is_categorical_dtype(df[group_var]):
-        groups = df[group_var].cat.categories
+    # Retrieve groups in order:
+    if pd.api.types.is_categorical_dtype(df[rating_var]):
+        groups = df[rating_var].cat.categories
     else:
-        groups = sorted(df[group_var].unique())
+        groups = sorted(df[rating_var].unique())
     
-    # Calculate the LRA DR (default rate) and the binomial variance for each group.
-    stats = []
-    for group in groups:
-        sub_df = df[df[group_var] == group]
+    for grp in groups:
+        sub_df = df[df[rating_var] == grp]
         n = len(sub_df)
-        dr = sub_df[default_var].mean()
-        # Under a binomial assumption, variance = p*(1-p)/n
-        var = dr * (1 - dr) / n if n > 0 else np.nan
-        stats.append({'group': group, 'n': n, 'dr': dr, 'var': var})
-    
-    stats_df = pd.DataFrame(stats)
-    
-    # Calculate the two-sample Z-statistic for each adjacent group pair.
-    results_list = []
-    for i in range(1, len(stats_df)):
-        dr_i = stats_df.loc[i, 'dr']
-        dr_prev = stats_df.loc[i - 1, 'dr']
-        var_sum = stats_df.loc[i, 'var'] + stats_df.loc[i - 1, 'var']
-        # Compute Z-statistic only if the combined variance is positive.
-        z_stat = (dr_i - dr_prev) / np.sqrt(var_sum) if var_sum > 0 else np.nan
-        # Two-sided p-value from the standard normal distribution:
-        p_value = 2 * (1 - norm.cdf(abs(z_stat))) if not np.isnan(z_stat) else np.nan
         
-        results_list.append({
-            'Group i-1': stats_df.loc[i - 1, 'group'],
-            'Group i': stats_df.loc[i, 'group'],
-            'DR i-1': dr_prev,
-            'DR i': dr_i,
+        # Check if we have sufficient observations
+        if n < 2:
+            results.append({
+                'Rating': grp,
+                'N': n,
+                'Median_Threshold': np.nan,
+                'DR_<=median': np.nan,
+                'DR_>median': np.nan,
+                'Z-stat': np.nan,
+                'p-value': np.nan,
+                'Homogeneity': 'Insufficient data'
+            })
+            continue
+        
+        # Calculate the median of the score_var in this group (threshold for splitting)
+        median_threshold = sub_df[score_var].median()
+        
+        # Split data using the median threshold:
+        half1 = sub_df[sub_df[score_var] <= median_threshold]
+        half2 = sub_df[sub_df[score_var] > median_threshold]
+        n1, n2 = len(half1), len(half2)
+        
+        # Require both halves to have data.
+        if n1 == 0 or n2 == 0:
+            results.append({
+                'Rating': grp,
+                'N': n,
+                'Median_Threshold': median_threshold,
+                'DR_<=median': np.nan,
+                'DR_>median': np.nan,
+                'Z-stat': np.nan,
+                'p-value': np.nan,
+                'Homogeneity': 'Insufficient split'
+            })
+            continue
+        
+        # Calculate long-run average default rates in each half
+        dr1 = half1[default_var].mean()   # for observations with score_var ≤ median
+        dr2 = half2[default_var].mean()   # for observations with score_var > median
+        
+        # Calculate binomial variances (variance = p*(1-p)/n)
+        var1 = dr1 * (1 - dr1) / n1
+        var2 = dr2 * (1 - dr2) / n2
+        var_sum = var1 + var2
+        
+        # Compute Z-statistic and corresponding two-sided p-value
+        if var_sum > 0:
+            z_stat = (dr1 - dr2) / np.sqrt(var_sum)
+            p_val = 2 * (1 - norm.cdf(abs(z_stat)))
+        else:
+            z_stat = np.nan
+            p_val = np.nan
+        
+        # If p-value is >= alpha, we fail to reject the null, so the default rates are statistically similar, i.e. homogeneous.
+        homogeneity = "Homogeneous" if p_val >= alpha else "Not Homogeneous"
+        
+        results.append({
+            'Rating': grp,
+            'N': n,
+            'Median_Threshold': median_threshold,
+            'DR_<=median': dr1,
+            'DR_>median': dr2,
             'Z-stat': z_stat,
-            'p-value': p_value
+            'p-value': p_val,
+            'Homogeneity': homogeneity
         })
     
-    z_df = pd.DataFrame(results_list)
-    
-    # Split the results:
-    # Heterogeneity: p-value < alpha (reject H0: default rates are equal)
-    heterogeneity_df = z_df[z_df['p-value'] < alpha].reset_index(drop=True)
-    # Homogeneity: p-value >= alpha (fail to reject H0, i.e. default rates are not significantly different)
-    homogeneity_df = z_df[z_df['p-value'] >= alpha].reset_index(drop=True)
-    
-    return heterogeneity_df, homogeneity_df
+    return pd.DataFrame(results)
 
 # Example usage:
+# Suppose chc_df is your DataFrame and it contains:
+#   - CRR_group (rating group, ordered categorical)
+#   - DEFAULT_EVENT (binary default indicator)
+#   - score_var (the continuous variable to split on)
+homogeneity_results = calculate_homogeneity_by_median(
+    chc_df,
+    rating_var='CRR_group',
+    default_var='DEFAULT_EVENT',
+    score_var='score_var',
+    alpha=0.05
+)
 
-# Suppose chc_df is your DataFrame, CRR_group is an ordered categorical variable,
-# and DEFAULT_EVENT is the binary default indicator.
-heterogeneity_df, homogeneity_df = calculate_z_stats_for_crr_groups(chc_df, group_var='CRR_group', default_var='DEFAULT_EVENT', alpha=0.05)
-
-print("Heterogeneity Results (Significant differences):")
-print(heterogeneity_df)
-print("\nHomogeneity Results (No significant difference):")
-print(homogeneity_df)
+print(homogeneity_results)
