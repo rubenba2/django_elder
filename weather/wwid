@@ -1,1 +1,55 @@
+import pandas as pd
+import numpy as np
 
+def calculate_psi(df1, df2, num_bins=10):
+    """
+    Calculate Population Stability Index (PSI) for all variables between two DataFrames.
+    
+    Parameters:
+        df1 (pd.DataFrame): Reference/base dataset
+        df2 (pd.DataFrame): Current/target dataset
+        num_bins (int): Number of bins to use for numerical variables (default: 10)
+    
+    Returns:
+        pd.DataFrame: DataFrame with PSI values for each variable
+    """
+    psi_results = []
+    
+    for col in df1.columns:
+        # Handle numerical variables
+        if np.issubdtype(df1[col].dtype, np.number):
+            # Calculate bin edges based on percentiles from df1
+            percentiles = np.linspace(0, 100, num_bins + 1)
+            bin_edges = np.percentile(df1[col].dropna(), percentiles)
+            
+            # Ensure unique bin edges (handle cases with many identical values)
+            bin_edges = np.unique(bin_edges)
+            
+            # If all values are identical, create a single bin
+            if len(bin_edges) == 1:
+                bin_edges = np.array([-np.inf, bin_edges[0], np.inf])
+            
+            # Bin the data in both dataframes
+            df1_binned = pd.cut(df1[col], bins=bin_edges, include_lowest=True)
+            df2_binned = pd.cut(df2[col], bins=bin_edges, include_lowest=True)
+            
+            # Calculate frequencies
+            freq1 = df1_binned.value_counts(normalize=True, dropna=False).sort_index()
+            freq2 = df2_binned.value_counts(normalize=True, dropna=False).sort_index()
+            
+        # Handle categorical variables
+        else:
+            # Calculate frequencies for categorical data
+            freq1 = df1[col].value_counts(normalize=True, dropna=False).sort_index()
+            freq2 = df2[col].value_counts(normalize=True, dropna=False).sort_index()
+            
+            # Ensure both frequency distributions have the same categories
+            all_categories = freq1.index.union(freq2.index)
+            freq1 = freq1.reindex(all_categories, fill_value=0)
+            freq2 = freq2.reindex(all_categories, fill_value=0)
+        
+        # Calculate PSI
+        psi = np.sum((freq2 - freq1) * np.log(freq2 / freq1))
+        psi_results.append({'variable': col, 'psi': psi})
+    
+    return pd.DataFrame(psi_results).sort_values('psi', ascending=False)
