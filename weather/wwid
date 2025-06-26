@@ -1,21 +1,26 @@
 import pandas as pd
 import numpy as np
 
-def calculate_psi(df1, df2, num_bins=10):
+def calculate_psi(df1, df2, columns_to_test=None, num_bins=10):
     """
-    Calculate Population Stability Index (PSI) for all variables between two DataFrames.
+    Calculate Population Stability Index (PSI) for specified variables between two DataFrames.
     
     Parameters:
         df1 (pd.DataFrame): Reference/base dataset
         df2 (pd.DataFrame): Current/target dataset
+        columns_to_test (list): List of column names to calculate PSI for (None means all columns)
         num_bins (int): Number of bins to use for numerical variables (default: 10)
     
     Returns:
         pd.DataFrame: DataFrame with PSI values for each variable
     """
+    # If no columns specified, use all common columns
+    if columns_to_test is None:
+        columns_to_test = df1.columns.tolist()
+    
     psi_results = []
     
-    for col in df1.columns:
+    for col in columns_to_test:
         # Handle numerical variables
         if np.issubdtype(df1[col].dtype, np.number):
             # Calculate bin edges based on percentiles from df1
@@ -53,3 +58,4 @@ def calculate_psi(df1, df2, num_bins=10):
         psi_results.append({'variable': col, 'psi': psi})
     
     return pd.DataFrame(psi_results).sort_values('psi', ascending=False)
+
