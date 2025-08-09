@@ -1,61 +1,13 @@
-import pandas as pd
-import numpy as np
-
-def calculate_psi(df1, df2, columns_to_test=None, num_bins=10):
-    """
-    Calculate Population Stability Index (PSI) for specified variables between two DataFrames.
-    
-    Parameters:
-        df1 (pd.DataFrame): Reference/base dataset
-        df2 (pd.DataFrame): Current/target dataset
-        columns_to_test (list): List of column names to calculate PSI for (None means all columns)
-        num_bins (int): Number of bins to use for numerical variables (default: 10)
-    
-    Returns:
-        pd.DataFrame: DataFrame with PSI values for each variable
-    """
-    # If no columns specified, use all common columns
-    if columns_to_test is None:
-        columns_to_test = df1.columns.tolist()
-    
-    psi_results = []
-    
-    for col in columns_to_test:
-        # Handle numerical variables
-        if np.issubdtype(df1[col].dtype, np.number):
-            # Calculate bin edges based on percentiles from df1
-            percentiles = np.linspace(0, 100, num_bins + 1)
-            bin_edges = np.percentile(df1[col].dropna(), percentiles)
-            
-            # Ensure unique bin edges (handle cases with many identical values)
-            bin_edges = np.unique(bin_edges)
-            
-            # If all values are identical, create a single bin
-            if len(bin_edges) == 1:
-                bin_edges = np.array([-np.inf, bin_edges[0], np.inf])
-            
-            # Bin the data in both dataframes
-            df1_binned = pd.cut(df1[col], bins=bin_edges, include_lowest=True)
-            df2_binned = pd.cut(df2[col], bins=bin_edges, include_lowest=True)
-            
-            # Calculate frequencies
-            freq1 = df1_binned.value_counts(normalize=True, dropna=False).sort_index()
-            freq2 = df2_binned.value_counts(normalize=True, dropna=False).sort_index()
-            
-        # Handle categorical variables
-        else:
-            # Calculate frequencies for categorical data
-            freq1 = df1[col].value_counts(normalize=True, dropna=False).sort_index()
-            freq2 = df2[col].value_counts(normalize=True, dropna=False).sort_index()
-            
-            # Ensure both frequency distributions have the same categories
-            all_categories = freq1.index.union(freq2.index)
-            freq1 = freq1.reindex(all_categories, fill_value=0)
-            freq2 = freq2.reindex(all_categories, fill_value=0)
-        
-        # Calculate PSI
-        psi = np.sum((freq2 - freq1) * np.log(freq2 / freq1))
-        psi_results.append({'variable': col, 'psi': psi})
-    
-    return pd.DataFrame(psi_results).sort_values('psi', ascending=False)
-
+Feature | Traditional Fund | Hedge Fund | Private Equity Fund
+--------|------------------|------------|---------------------
+Regulation | Heavily regulated (e.g., UCITS in EU, 1940 Act in US) | Lightly regulated, often offshore or under private placement rules | Lightly regulated, private placement exemptions
+Investor Access | Open to retail investors | Restricted to accredited/high-net-worth investors | Restricted to accredited/high-net-worth investors
+Liquidity | Daily pricing and redemption | Lock-ups; redemptions quarterly/annually | Very illiquid; capital committed for 7–12 years
+Leverage | Limited by regulation | Can use significant leverage | Often uses leverage at the portfolio company level
+Investment Strategies | Primarily long-only equities/bonds | Wide range: long/short, derivatives, arbitrage, macro, event-driven | Direct ownership in private companies; buyouts, growth capital, venture
+Transparency | High: regular holdings disclosure | Low: limited position disclosure | Low: periodic portfolio company updates
+Fee Structure | Management fee (0.2–2% of AUM) | ~2% management + ~20% performance fee | ~2% management + ~20% carried interest on profits at exit
+Valuation | Daily market value | Monthly/quarterly, sometimes illiquid assets | Infrequent (quarterly/annual) based on private company valuations
+Risk Profile | Lower volatility, benchmark-driven | Can take concentrated, high-risk positions | High risk due to illiquidity, concentration, and operational exposure
+Benchmark | Compared to market index | Often absolute-return focused | Compared to private equity benchmarks (e.g., PME vs public markets)
+Capital Deployment | Fully invested quickly | Fully invested quickly | Capital called over several years as deals close
