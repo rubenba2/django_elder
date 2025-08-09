@@ -1,13 +1,1 @@
-Feature | Traditional Fund | Hedge Fund | Private Equity Fund
---------|------------------|------------|---------------------
-Regulation | Heavily regulated (e.g., UCITS in EU, 1940 Act in US) | Lightly regulated, often offshore or under private placement rules | Lightly regulated, private placement exemptions
-Investor Access | Open to retail investors | Restricted to accredited/high-net-worth investors | Restricted to accredited/high-net-worth investors
-Liquidity | Daily pricing and redemption | Lock-ups; redemptions quarterly/annually | Very illiquid; capital committed for 7–12 years
-Leverage | Limited by regulation | Can use significant leverage | Often uses leverage at the portfolio company level
-Investment Strategies | Primarily long-only equities/bonds | Wide range: long/short, derivatives, arbitrage, macro, event-driven | Direct ownership in private companies; buyouts, growth capital, venture
-Transparency | High: regular holdings disclosure | Low: limited position disclosure | Low: periodic portfolio company updates
-Fee Structure | Management fee (0.2–2% of AUM) | ~2% management + ~20% performance fee | ~2% management + ~20% carried interest on profits at exit
-Valuation | Daily market value | Monthly/quarterly, sometimes illiquid assets | Infrequent (quarterly/annual) based on private company valuations
-Risk Profile | Lower volatility, benchmark-driven | Can take concentrated, high-risk positions | High risk due to illiquidity, concentration, and operational exposure
-Benchmark | Compared to market index | Often absolute-return focused | Compared to private equity benchmarks (e.g., PME vs public markets)
-Capital Deployment | Fully invested quickly | Fully invested quickly | Capital called over several years as deals close
+
