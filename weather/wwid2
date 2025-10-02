@@ -70,3 +70,20 @@ print("Coefficient Summary Statistics:")
 print(coefficients_df.describe())
 print("\nGini Index Summary Statistics:")
 print(ginis_df.describe())
+
+
+
+
+    out = pd.Series({
+        "avg_diff":        s.mean(),
+        "avg_abs_diff":    ad.mean(),
+        "% diff > 0":      (s > 0).mean() * 100,
+        "% same (diff=0)": (s == 0).mean() * 100,
+        "% diff < 0":      (s < 0).mean() * 100,
+        "% |diff| = 1":    (ad == 1).mean() * 100,
+        "% |diff| = 2":    (ad == 2).mean() * 100,
+        "% |diff| = 3":    (ad == 3).mean() * 100,
+        "% |diff| > 3":    (ad > 3).mean() * 100,
+        "n_pairs_used":    n,
+    })
+
