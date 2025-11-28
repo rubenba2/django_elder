@@ -1,27 +1,12 @@
-import pandas as pd
-import numpy as np
-from scipy.stats import chi2_contingency
-
-def cramers_v(df, cat_var, target):
-    """
-    Correlation measure for categorical risk driver vs binary dependent variable.
-    Returns Cramér's V (0–1).
-    """
-
-    # contingency table
-    ct = pd.crosstab(df[cat_var], df[target])
-
-    # chi-square
-    chi2, _, _, _ = chi2_contingency(ct)
-
-    n = ct.sum().sum()
-    r, k = ct.shape
-
-    # correction (Bergsma 2013), prevents inflation when small
-    phi2 = chi2 / n
-    phi2_corr = max(0, phi2 - (k - 1)*(r - 1)/(n - 1))
-    r_corr = r - (r - 1)**2/(n - 1)
-    k_corr = k - (k - 1)**2/(n - 1)
-
-    return np.sqrt(phi2_corr / min((k_corr - 1), (r_corr - 1)))
-
+find /path/to/folder -type f -printf "%s\t%p\t%Tc\n" \
+  | sort -nr \
+  | head -10 \
+  | awk -F '\t' '{
+      size=$1;
+      if (size > 1024*1024*1024) {
+          hsize = sprintf("%.2f GB", size/1024/1024/1024);
+      } else {
+          hsize = sprintf("%.2f MB", size/1024/1024);
+      }
+      printf "%-10s  %s  %s\n", hsize, $3, $2;
+    }'
