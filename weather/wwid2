@@ -1,12 +1,1 @@
-find /path/to/folder -type f -printf "%s\t%p\t%Tc\n" \
-  | sort -nr \
-  | head -10 \
-  | awk -F '\t' '{
-      size=$1;
-      if (size > 1024*1024*1024) {
-          hsize = sprintf("%.2f GB", size/1024/1024/1024);
-      } else {
-          hsize = sprintf("%.2f MB", size/1024/1024);
-      }
-      printf "%-10s  %s  %s\n", hsize, $3, $2;
-    }'
+
