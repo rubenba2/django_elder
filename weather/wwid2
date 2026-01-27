@@ -1,1 +1,65 @@
+import numpy as np
+import pandas as pd
 
+def calculate_psi(col1, col2):
+    """
+    Calculate PSI (Population Stability Index) between two columns
+    
+    Parameters:
+    col1: pd.Series or array-like - baseline distribution (int or float)
+    col2: pd.Series or array-like - new distribution (int or float)
+    
+    Returns:
+    pd.DataFrame - containing PSI value and interpretation
+    
+    PSI Interpretation:
+    - PSI < 0.1: No significant change
+    - 0.1 ≤ PSI < 0.25: Moderate change
+    - PSI ≥ 0.25: Significant change
+    """
+    # Convert to pandas Series if not already
+    if not isinstance(col1, pd.Series):
+        col1 = pd.Series(col1)
+    if not isinstance(col2, pd.Series):
+        col2 = pd.Series(col2)
+    
+    # Convert to string to treat each unique value as a category
+    expected = col1.astype(str)
+    actual = col2.astype(str)
+    
+    # Get value counts and percentages
+    expected_percents = expected.value_counts(normalize=True)
+    actual_percents = actual.value_counts(normalize=True)
+    
+    # Combine all categories from both distributions
+    all_categories = set(expected_percents.index) | set(actual_percents.index)
+    
+    psi_value = 0
+    
+    for category in all_categories:
+        # Use small value to avoid log(0)
+        exp_pct = expected_percents.get(category, 0.0001)
+        act_pct = actual_percents.get(category, 0.0001)
+        
+        # PSI formula: (Actual% - Expected%) * ln(Actual% / Expected%)
+        psi_value += (act_pct - exp_pct) * np.log(act_pct / exp_pct)
+    
+    # Determine interpretation
+    if psi_value < 0.1:
+        interpretation = "No significant change"
+    elif psi_value < 0.25:
+        interpretation = "Moderate change"
+    else:
+        interpretation = "Significant change"
+    
+    # Create result DataFrame
+    result_df = pd.DataFrame({
+        'PSI': [psi_value],
+        'Interpretation': [interpretation]
+    })
+    
+    return result_df
+
+# Usage:
+# result = calculate_psi(df1['col1'], df1['col2'])
+# print(result)
