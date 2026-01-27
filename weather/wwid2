@@ -18,14 +18,40 @@ def calculate_psi(col1, col2):
     - PSI ≥ 0.25: Significant change
     """
     # Convert to pandas Series if not already
+    # Handle None inputs
+    if col1 is None or col2 is None:
+        return pd.DataFrame({
+            'PSI': [np.nan],
+            'Interpretation': ['Error: One or both columns are None']
+        })
+    
+    # Convert to pandas Series if not already
     if not isinstance(col1, pd.Series):
         col1 = pd.Series(col1)
     if not isinstance(col2, pd.Series):
         col2 = pd.Series(col2)
     
+    # Check if columns are empty
+    if len(col1) == 0 or len(col2) == 0:
+        return pd.DataFrame({
+            'PSI': [np.nan],
+            'Interpretation': ['Error: One or both columns are empty']
+        })
+    
+    # Remove NaN/None values
+    col1_clean = col1.dropna()
+    col2_clean = col2.dropna()
+    
+    # Check if columns are empty after removing NaN
+    if len(col1_clean) == 0 or len(col2_clean) == 0:
+        return pd.DataFrame({
+            'PSI': [np.nan],
+            'Interpretation': ['Error: All values are NaN/None']
+        })
+    
     # Convert to string to treat each unique value as a category
-    expected = col1.astype(str)
-    actual = col2.astype(str)
+    expected = col1_clean.astype(str)
+    actual = col2_clean.astype(str)
     
     # Get value counts and percentages
     expected_percents = expected.value_counts(normalize=True)
