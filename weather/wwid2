@@ -1,14 +1,17 @@
+import pandas as pd
+import numpy as np
+
 def calculate_categorical_psi(expected, actual):
-    # 1. Get the percentage distribution for both strings
+    # 1. Get percentage distributions
     expected_perc = expected.value_counts(normalize=True)
     actual_perc = actual.value_counts(normalize=True)
 
-    # 2. Align them into one table (handles missing categories in either string)
+    # 2. Align categories and handle zeros
     df = pd.DataFrame({'expected': expected_perc, 'actual': actual_perc}).fillna(0.0001)
 
-    # 3. Apply the PSI formula per category
-    df['psi_elements'] = (df['actual'] - df['expected']) * np.log(df['actual'] / df['expected'])
-    
+    # 3. Calculate PSI
+    psi_value = np.sum((df['actual'] - df['expected']) * np.log(df['actual'] / df['expected']))
+
     # 4. Interpret the result
     if psi_value < 0.10:
         interpretation = "Insignificant change"
@@ -19,4 +22,6 @@ def calculate_categorical_psi(expected, actual):
 
     return psi_value, interpretation
 
-    return df['psi_elements'].sum()
+# --- Usage ---
+psi, status = calculate_categorical_psi(base_series, new_series)
+print(f"PSI: {psi:.4f} | Status: {status}")
