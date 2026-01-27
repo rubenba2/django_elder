@@ -1,44 +1,22 @@
 import numpy as np
 import pandas as pd
 
-def psi_numeric_as_categorical(
-    df_two_cols: pd.DataFrame,
-    col_expected: str,
-    col_actual: str,
-    eps: float = 1e-6
-):
+def psi_categorical_simple(df, col_expected, col_actual, eps=1e-6):
     """
-    PSI where numeric values are treated as categories.
+    Calculate PSI between two categorical (string) columns.
 
-    Steps:
-    1) Drop rows with NA in either column
-    2) Keep only rows where BOTH values are int/float (incl. numpy numeric), finite
-    3) Cast to string categories and compute PSI
-    4) Return (psi_value, interpretation, detail_df)
+    - Drops rows with NA in either column
+    - Treats values as categories
+    - Returns (psi_value, interpretation)
     """
 
-    d = df_two_cols[[col_expected, col_actual]].copy()
+    d = df[[col_expected, col_actual]].dropna()
 
-    # 1) remove NA (either column)
-    d = d.dropna(subset=[col_expected, col_actual])
-
-    # 2) keep only numeric + finite in both columns
-    exp_num = pd.to_numeric(d[col_expected], errors="coerce")
-    act_num = pd.to_numeric(d[col_actual], errors="coerce")
-    mask = np.isfinite(exp_num.to_numpy()) & np.isfinite(act_num.to_numpy())
-    d = d.loc[mask].copy()
-
-    # if insufficient data, PSI not meaningful
     if len(d) == 0:
-        return np.nan, "insufficient data (0 valid rows after filtering)", pd.DataFrame()
+        return np.nan, "insufficient data (no valid rows)"
 
-    # 3) treat numeric values as categories (strings)
-    exp_cat = exp_num.loc[d.index].astype(str)
-    act_cat = act_num.loc[d.index].astype(str)
-
-    # aligned category proportions
-    p = exp_cat.value_counts(normalize=True)
-    q = act_cat.value_counts(normalize=True)
+    p = d[col_expected].value_counts(normalize=True)
+    q = d[col_actual].value_counts(normalize=True)
 
     dist = pd.concat([p, q], axis=1, keys=["expected", "actual"]).fillna(0.0)
 
@@ -46,20 +24,15 @@ def psi_numeric_as_categorical(
     dist["expected"] = dist["expected"].clip(lower=eps)
     dist["actual"] = dist["actual"].clip(lower=eps)
 
-    dist["psi_component"] = (dist["expected"] - dist["actual"]) * np.log(dist["expected"] / dist["actual"])
-    psi_value = float(dist["psi_component"].sum())
+    psi = ((dist["expected"] - dist["actual"]) *
+           np.log(dist["expected"] / dist["actual"])).sum()
 
-    # 4) interpretation (common industry thresholds)
-    if np.isnan(psi_value):
-        interp = "PSI could not be computed"
-    elif psi_value < 0.10:
-        interp = "low shift (PSI < 0.10)"
-    elif psi_value < 0.25:
-        interp = "moderate shift (0.10 ≤ PSI < 0.25)"
+    # interpretation (standard thresholds)
+    if psi < 0.10:
+        interpretation = "low shift (PSI < 0.10)"
+    elif psi < 0.25:
+        interpretation = "moderate shift (0.10 ≤ PSI < 0.25)"
     else:
-        interp = "significant shift (PSI ≥ 0.25)"
+        interpretation = "significant shift (PSI ≥ 0.25)"
 
-    # optional: sort by largest contribution for readability
-    dist = dist.sort_values("psi_component", ascending=False)
-
-    return psi_value, interp, dist
+    return float(psi), interpretation
