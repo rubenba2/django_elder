@@ -1,38 +1,13 @@
-import numpy as np
-import pandas as pd
+def calculate_categorical_psi(expected, actual):
+    # 1. Get the percentage distribution for both strings
+    expected_perc = expected.value_counts(normalize=True)
+    actual_perc = actual.value_counts(normalize=True)
 
-def psi_categorical_simple(df, col_expected, col_actual, eps=1e-6):
-    """
-    Calculate PSI between two categorical (string) columns.
+    # 2. Align them into one table (handles missing categories in either string)
+    df = pd.DataFrame({'expected': expected_perc, 'actual': actual_perc}).fillna(0.0001)
 
-    - Drops rows with NA in either column
-    - Treats values as categories
-    - Returns (psi_value, interpretation)
-    """
-
-    d = df[[col_expected, col_actual]].dropna()
-
-    if len(d) == 0:
-        return np.nan, "insufficient data (no valid rows)"
-
-    p = d[col_expected].value_counts(normalize=True)
-    q = d[col_actual].value_counts(normalize=True)
-
-    dist = pd.concat([p, q], axis=1, keys=["expected", "actual"]).fillna(0.0)
-
-    # avoid log(0)
-    dist["expected"] = dist["expected"].clip(lower=eps)
-    dist["actual"] = dist["actual"].clip(lower=eps)
-
-    psi = ((dist["expected"] - dist["actual"]) *
-           np.log(dist["expected"] / dist["actual"])).sum()
-
-    # interpretation (standard thresholds)
-    if psi < 0.10:
-        interpretation = "low shift (PSI < 0.10)"
-    elif psi < 0.25:
-        interpretation = "moderate shift (0.10 ≤ PSI < 0.25)"
-    else:
-        interpretation = "significant shift (PSI ≥ 0.25)"
-
-    return float(psi), interpretation
+    # 3. Apply the PSI formula per category
+    df['psi_elements'] = (df['actual'] - df['expected']) * np.log(df['actual'] / df['expected'])
+    
+    # 4. Sum them up
+    return df['psi_elements'].sum()
