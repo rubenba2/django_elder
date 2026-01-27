@@ -1,91 +1,65 @@
 import numpy as np
 import pandas as pd
 
-def calculate_psi(col1, col2):
+def psi_numeric_as_categorical(
+    df_two_cols: pd.DataFrame,
+    col_expected: str,
+    col_actual: str,
+    eps: float = 1e-6
+):
     """
-    Calculate PSI (Population Stability Index) between two columns
-    
-    Parameters:
-    col1: pd.Series or array-like - baseline distribution (int or float)
-    col2: pd.Series or array-like - new distribution (int or float)
-    
-    Returns:
-    pd.DataFrame - containing PSI value and interpretation
-    
-    PSI Interpretation:
-    - PSI < 0.1: No significant change
-    - 0.1 ≤ PSI < 0.25: Moderate change
-    - PSI ≥ 0.25: Significant change
-    """
-    # Convert to pandas Series if not already
-    # Handle None inputs
-    if col1 is None or col2 is None:
-        return pd.DataFrame({
-            'PSI': [np.nan],
-            'Interpretation': ['Error: One or both columns are None']
-        })
-    
-    # Convert to pandas Series if not already
-    if not isinstance(col1, pd.Series):
-        col1 = pd.Series(col1)
-    if not isinstance(col2, pd.Series):
-        col2 = pd.Series(col2)
-    
-    # Check if columns are empty
-    if len(col1) == 0 or len(col2) == 0:
-        return pd.DataFrame({
-            'PSI': [np.nan],
-            'Interpretation': ['Error: One or both columns are empty']
-        })
-    
-    # Remove NaN/None values
-    col1_clean = col1.dropna()
-    col2_clean = col2.dropna()
-    
-    # Check if columns are empty after removing NaN
-    if len(col1_clean) == 0 or len(col2_clean) == 0:
-        return pd.DataFrame({
-            'PSI': [np.nan],
-            'Interpretation': ['Error: All values are NaN/None']
-        })
-    
-    # Convert to string to treat each unique value as a category
-    expected = col1_clean.astype(str)
-    actual = col2_clean.astype(str)
-    
-    # Get value counts and percentages
-    expected_percents = expected.value_counts(normalize=True)
-    actual_percents = actual.value_counts(normalize=True)
-    
-    # Combine all categories from both distributions
-    all_categories = set(expected_percents.index) | set(actual_percents.index)
-    
-    psi_value = 0
-    
-    for category in all_categories:
-        # Use small value to avoid log(0)
-        exp_pct = expected_percents.get(category, 0.0001)
-        act_pct = actual_percents.get(category, 0.0001)
-        
-        # PSI formula: (Actual% - Expected%) * ln(Actual% / Expected%)
-        psi_value += (act_pct - exp_pct) * np.log(act_pct / exp_pct)
-    
-    # Determine interpretation
-    if psi_value < 0.1:
-        interpretation = "No significant change"
-    elif psi_value < 0.25:
-        interpretation = "Moderate change"
-    else:
-        interpretation = "Significant change"
-    
-    # Create result DataFrame
-    result_df = pd.DataFrame({
-        'PSI': [psi_value],
-        'Interpretation': [interpretation]
-    })
-    
-    return result_df
+    PSI where numeric values are treated as categories.
 
-# Usage:
-# result = calculate_psi(df1['col1'], df1['col2'])
-# print(result)
+    Steps:
+    1) Drop rows with NA in either column
+    2) Keep only rows where BOTH values are int/float (incl. numpy numeric), finite
+    3) Cast to string categories and compute PSI
+    4) Return (psi_value, interpretation, detail_df)
+    """
+
+    d = df_two_cols[[col_expected, col_actual]].copy()
+
+    # 1) remove NA (either column)
+    d = d.dropna(subset=[col_expected, col_actual])
+
+    # 2) keep only numeric + finite in both columns
+    exp_num = pd.to_numeric(d[col_expected], errors="coerce")
+    act_num = pd.to_numeric(d[col_actual], errors="coerce")
+    mask = np.isfinite(exp_num.to_numpy()) & np.isfinite(act_num.to_numpy())
+    d = d.loc[mask].copy()
+
+    # if insufficient data, PSI not meaningful
+    if len(d) == 0:
+        return np.nan, "insufficient data (0 valid rows after filtering)", pd.DataFrame()
+
+    # 3) treat numeric values as categories (strings)
+    exp_cat = exp_num.loc[d.index].astype(str)
+    act_cat = act_num.loc[d.index].astype(str)
+
+    # aligned category proportions
+    p = exp_cat.value_counts(normalize=True)
+    q = act_cat.value_counts(normalize=True)
+
+    dist = pd.concat([p, q], axis=1, keys=["expected", "actual"]).fillna(0.0)
+
+    # avoid log(0)
+    dist["expected"] = dist["expected"].clip(lower=eps)
+    dist["actual"] = dist["actual"].clip(lower=eps)
+
+    dist["psi_component"] = (dist["expected"] - dist["actual"]) * np.log(dist["expected"] / dist["actual"])
+    psi_value = float(dist["psi_component"].sum())
+
+    # 4) interpretation (common industry thresholds)
+    if np.isnan(psi_value):
+        interp = "PSI could not be computed"
+    elif psi_value < 0.10:
+        interp = "low shift (PSI < 0.10)"
+    elif psi_value < 0.25:
+        interp = "moderate shift (0.10 ≤ PSI < 0.25)"
+    else:
+        interp = "significant shift (PSI ≥ 0.25)"
+
+    # optional: sort by largest contribution for readability
+    dist = dist.sort_values("psi_component", ascending=False)
+
+    return psi_value, interp, dist
