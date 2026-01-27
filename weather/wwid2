@@ -9,5 +9,14 @@ def calculate_categorical_psi(expected, actual):
     # 3. Apply the PSI formula per category
     df['psi_elements'] = (df['actual'] - df['expected']) * np.log(df['actual'] / df['expected'])
     
-    # 4. Sum them up
+    # 4. Interpret the result
+    if psi_value < 0.10:
+        interpretation = "Insignificant change"
+    elif 0.10 <= psi_value < 0.25:
+        interpretation = "Minor shift; monitor closely"
+    else:
+        interpretation = "Significant shift; action required"
+
+    return psi_value, interpretation
+
     return df['psi_elements'].sum()
