@@ -58,3 +58,94 @@ plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
 plt.tight_layout()
 
 plt.savefig('macro_plot.png')
+
+
+
+
+
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# ---------- 1) Load actual macro data ----------
+# FRED: GDP (quarterly) + HICP (monthly)
+from pandas_datareader import data as pdr
+
+start, end = "2013-01-01", "2023-12-31"
+
+gdp_q = pdr.DataReader("CLVMEURSCAB1GQEA19", "fred", start, end)   # real GDP, quarterly
+hicp_m = pdr.DataReader("CP0000EZ19M086NEST", "fred", start, end) # HICP index, monthly
+
+# ECB Data Portal: unemployment rate (monthly) via SDMX-CSV endpoint
+# The ECB dataset page shows the series key format; you can change key if you want Total/All persons etc.
+# Example pattern from the ECB page: LFSI.M.<...>.UNEHRT.<...>
+# Use ECB's SDMX-CSV endpoint (works without an API key):
+ecb_series_key = "LFSI.M.I8.S.UNEHRT.TOTAL0.15_74.T"  # <-- adjust to the exact key you want from ECB portal if needed
+ecb_url = (
+    "https://data-api.ecb.europa.eu/service/data/"
+    f"{ecb_series_key}?startPeriod=2013-01&endPeriod=2023-12&format=csvdata"
+)
+unemp_m = pd.read_csv(ecb_url)
+
+# ECB CSV typically has TIME_PERIOD + OBS_VALUE columns
+unemp_m["TIME_PERIOD"] = pd.to_datetime(unemp_m["TIME_PERIOD"])
+unemp_m = (unemp_m[["TIME_PERIOD", "OBS_VALUE"]]
+           .rename(columns={"TIME_PERIOD": "Date", "OBS_VALUE": "UNEMP"})
+           .set_index("Date")
+           .sort_index())
+
+# ---------- 2) Convert to annual series (2013–2023) ----------
+# GDP: annual % change from annual average level
+gdp_y = gdp_q.resample("Y").mean()
+gdp_y["GDP_YoY_%"] = gdp_y["CLVMEURSCAB1GQEA19"].pct_change() * 100
+
+# HICP: annual inflation = % change Dec/Dec (common) or annual average.
+# Here: Dec/Dec inflation (using last month of each year)
+hicp_y = hicp_m.resample("Y").last()
+hicp_y["HICP_Infl_%"] = hicp_y["CP0000EZ19M086NEST"].pct_change() * 100
+
+# Unemployment: annual average of monthly
+unemp_y = unemp_m.resample("Y").mean()
+
+# Build one annual macro DF
+macro = pd.DataFrame(index=pd.date_range("2013-12-31", "2023-12-31", freq="Y"))
+macro["UNEMP_%"] = unemp_y["UNEMP"]
+macro["GDP_YoY_%"] = gdp_y["GDP_YoY_%"]
+macro["HICP_Infl_%"] = hicp_y["HICP_Infl_%"]
+
+# Add a 4th macro variable derived from GDP level: output gap proxy = GDP level z-score (simple, not structural)
+macro["GDP_Level_z"] = (gdp_y["CLVMEURSCAB1GQEA19"] - gdp_y["CLVMEURSCAB1GQEA19"].mean()) / gdp_y["CLVMEURSCAB1GQEA19"].std()
+
+macro.index = macro.index.year  # annual axis as int years
+
+# ---------- 3) Simulate default rate between 1% and 4% ----------
+rng = np.random.default_rng(42)
+df1 = pd.DataFrame(index=macro.index)
+df1["DefaultRate_%"] = 1 + 3 * np.clip(np.cumsum(rng.normal(0, 0.15, len(df1))) / 5 + 0.5, 0, 1)  # bounded-ish
+
+df = df1.join(macro, how="left")
+
+# ---------- 4) Plot: default rate left axis, macro variables right axis ----------
+fig, ax1 = plt.subplots(figsize=(11, 6))
+
+ax1.plot(df.index, df["DefaultRate_%"], linewidth=2, label="Default rate (simulated, %)")
+ax1.set_ylabel("Default rate (%)")
+ax1.set_xlabel("Year")
+
+ax2 = ax1.twinx()
+ax2.plot(df.index, df["UNEMP_%"], linewidth=2, label="Unemployment rate (%)")
+ax2.plot(df.index, df["GDP_YoY_%"], linewidth=2, label="Real GDP growth (YoY, %)")
+ax2.plot(df.index, df["HICP_Infl_%"], linewidth=2, label="Inflation (HICP, Dec/Dec, %)")
+ax2.plot(df.index, df["GDP_Level_z"], linewidth=2, label="GDP level (z-score)")
+
+ax2.set_ylabel("Macro series (various units)")
+
+# One combined legend (important when using twinx)
+h1, l1 = ax1.get_legend_handles_labels()
+h2, l2 = ax2.get_legend_handles_labels()
+ax1.legend(h1 + h2, l1 + l2, loc="upper left", frameon=True)
+
+fig.tight_layout()
+plt.show()
+
