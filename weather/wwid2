@@ -35,3 +35,26 @@ Unemployment Rate,Eurostat,une_rt_a (Annual),"Total unemployment rate as a perce
 GDP Growth,Eurostat,namq_10_gdp,"Real GDP growth (year-on-year percentage change), chain-linked volumes."
 Inflation (HICP),Eurostat,prc_hicp_aind,"Harmonised Index of Consumer Prices; annual average rate of change for ""All-items."""
 ECB Interest Rate,ECB,MRO (Key Rate),"Interest rate for the ""Main Refinancing Operations"" (the rate banks pay to borrow from the ECB)."
+
+
+
+
+
+# Plotting
+plt.figure(figsize=(12, 7))
+
+plt.plot(df1['Year'], df1['Default Rate (Simulated)'], label='Default Rate (Simulated)', marker='o', linewidth=3, color='black')
+plt.plot(df1['Year'], df1['Unemployment Rate'], label='Unemployment Rate (%)', marker='s', linestyle='--')
+plt.plot(df1['Year'], df1['GDP Growth'], label='GDP Growth (%)', marker='^', linestyle='--')
+plt.plot(df1['Year'], df1['Inflation (HICP)'], label='Inflation (HICP %)', marker='x', linestyle='--')
+plt.plot(df1['Year'], df1['ECB Interest Rate'], label='ECB Interest Rate (%)', marker='v', linestyle='--')
+
+plt.title('Simulated Default Rates vs. European Macro-Economic Indicators (2013-2023)', fontsize=14)
+plt.xlabel('Year', fontsize=12)
+plt.ylabel('Percentage (%)', fontsize=12)
+plt.xticks(years)
+plt.grid(True, linestyle=':', alpha=0.6)
+plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
+plt.tight_layout()
+
+plt.savefig('macro_plot.png')
