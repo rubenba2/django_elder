@@ -25,3 +25,13 @@ df1.to_csv('macro_default_data.csv', index=False)
 
 print("Data successfully generated and saved to 'macro_default_data.csv'")
 print(df1.head())
+
+
+
+
+
+Variable,Primary Source,Eurostat/ECB Dataset Code,Description
+Unemployment Rate,Eurostat,une_rt_a (Annual),"Total unemployment rate as a percentage of the active labor force, based on ILO standards."
+GDP Growth,Eurostat,namq_10_gdp,"Real GDP growth (year-on-year percentage change), chain-linked volumes."
+Inflation (HICP),Eurostat,prc_hicp_aind,"Harmonised Index of Consumer Prices; annual average rate of change for ""All-items."""
+ECB Interest Rate,ECB,MRO (Key Rate),"Interest rate for the ""Main Refinancing Operations"" (the rate banks pay to borrow from the ECB)."
