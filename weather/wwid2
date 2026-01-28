@@ -1,27 +1,27 @@
 import pandas as pd
 import numpy as np
 
-def calculate_categorical_psi(expected, actual):
-    # 1. Get percentage distributions
-    expected_perc = expected.value_counts(normalize=True)
-    actual_perc = actual.value_counts(normalize=True)
+# 1. Define the timeframe
+years = np.arange(2013, 2024)
 
-    # 2. Align categories and handle zeros
-    df = pd.DataFrame({'expected': expected_perc, 'actual': actual_perc}).fillna(0.0001)
+# 2. Sourced Euro Area Macro Data (approx. annual averages)
+macro_data = {
+    'Year': years,
+    'Unemployment_Rate': [12.0, 11.6, 10.9, 10.0, 9.1, 8.2, 7.5, 7.8, 7.7, 6.8, 6.6],
+    'GDP_Growth': [-0.2, 1.5, 2.1, 1.8, 2.6, 1.8, 1.6, -6.1, 6.4, 3.6, 0.4],
+    'Inflation_HICP': [1.3, 0.4, 0.1, 0.2, 1.7, 1.9, 1.5, 0.7, 2.9, 9.2, 6.4],
+    'ECB_Refi_Rate': [0.5, 0.15, 0.05, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.6, 3.8]
+}
 
-    # 3. Calculate PSI
-    psi_value = np.sum((df['actual'] - df['expected']) * np.log(df['actual'] / df['expected']))
+# 3. Create DataFrame and Simulate Default Rate (var1)
+df1 = pd.DataFrame(macro_data)
 
-    # 4. Interpret the result
-    if psi_value < 0.10:
-        interpretation = "Insignificant change"
-    elif 0.10 <= psi_value < 0.25:
-        interpretation = "Minor shift; monitor closely"
-    else:
-        interpretation = "Significant shift; action required"
+# Setting a seed ensures you get the same "random" numbers every time
+np.random.seed(42) 
+df1['var1_Default_Rate'] = np.random.uniform(1.0, 4.0, len(years))
 
-    return psi_value, interpretation
+# 4. Save locally to your machine
+df1.to_csv('macro_default_data.csv', index=False)
 
-# --- Usage ---
-psi, status = calculate_categorical_psi(base_series, new_series)
-print(f"PSI: {psi:.4f} | Status: {status}")
+print("Data successfully generated and saved to 'macro_default_data.csv'")
+print(df1.head())
