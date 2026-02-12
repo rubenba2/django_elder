@@ -2,13 +2,10 @@ Sub ExportTableCaptionsToCSV()
     Dim tbl As Table
     Dim para As Paragraph
     Dim fullText As String
-    Dim tableNumber As String
-    Dim caption As String
     Dim tableCount As Integer
     Dim outputPath As String
     Dim fso As Object
     Dim txtStream As Object
-    Dim colonPos As Integer
     
     ' Set output file path (same folder as document)
     outputPath = ThisDocument.Path & "\table_captions.csv"
@@ -18,15 +15,13 @@ Sub ExportTableCaptionsToCSV()
     Set txtStream = fso.CreateTextFile(outputPath, True)
     
     ' Write CSV header
-    txtStream.WriteLine "Table_Number,Caption"
+    txtStream.WriteLine "Full_Caption"
     
     tableCount = 1
     
     ' Loop through all tables
     For Each tbl In ActiveDocument.Tables
         fullText = ""
-        tableNumber = ""
-        caption = ""
         
         ' Try to find caption (usually the paragraph before the table)
         On Error Resume Next
@@ -34,39 +29,20 @@ Sub ExportTableCaptionsToCSV()
         On Error GoTo 0
         
         If fullText <> "" Then
-            ' Clean up line breaks
+            ' Clean up line breaks only
             fullText = Replace(fullText, vbCr, "")
             fullText = Replace(fullText, vbLf, "")
             fullText = Trim(fullText)
             
-            ' DEBUG: Show what we're working with
-            Debug.Print "Original text: [" & fullText & "]"
+            ' Escape quotes for CSV
+            fullText = Replace(fullText, """", """""")
             
-            ' Find the FIRST colon and split there
-            colonPos = InStr(fullText, ":")
-            
-            Debug.Print "Colon position: " & colonPos
-            
-            If colonPos > 0 Then
-                ' Everything up to and including the colon
-                tableNumber = Left(fullText, colonPos)
-                ' Everything after the colon (trimmed)
-                caption = Trim(Mid(fullText, colonPos + 1))
-                
-                Debug.Print "Table Number: [" & tableNumber & "]"
-                Debug.Print "Caption: [" & caption & "]"
-            Else
-                ' No colon found
-                tableNumber = fullText
-            End If
+            ' Write full text to CSV
+            txtStream.WriteLine """" & fullText & """"
+        Else
+            ' No caption found
+            txtStream.WriteLine """"""
         End If
-        
-        ' Escape quotes for CSV
-        tableNumber = Replace(tableNumber, """", """""")
-        caption = Replace(caption, """", """""")
-        
-        ' Write to CSV
-        txtStream.WriteLine """" & tableNumber & """,""" & caption & """"
         
         tableCount = tableCount + 1
     Next tbl
