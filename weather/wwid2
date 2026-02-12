@@ -1,19 +1,19 @@
-' Word VBA Macro: Extract "Table …: …" captions to CSV (2 columns)
-' Column 1 = everything left of the colon (e.g., "Table 6-4")
-' Column 2 = everything right of the colon, trimmed to start at first letter
-
 Option Explicit
 
-Public Sub ExportTableCaptionsToCSV()
+Public Sub ExportTableCaptionsToCSV_2()
+
     Dim doc As Document
     Set doc = ActiveDocument
-
-    ' Pick output file
+    
+    If doc.Path = "" Then
+        MsgBox "Please save the document first.", vbExclamation
+        Exit Sub
+    End If
+    
     Dim outPath As String
-    outPath = GetSavePathCSV()
-    If Len(outPath) = 0 Then Exit Sub
-
-    ' Regex: Table <number or section-number>: <caption>
+    outPath = doc.Path & Application.PathSeparator & "table_captions_2.csv"
+    
+    ' Regex pattern
     Dim re As Object
     Set re = CreateObject("VBScript.RegExp")
     With re
@@ -22,78 +22,75 @@ Public Sub ExportTableCaptionsToCSV()
         .MultiLine = False
         .Pattern = "^\s*(Table\s+\d+(?:-\d+)*)\s*:\s*(\S.*)\s*$"
     End With
-
-    ' Use UTF-8 output via ADODB.Stream
+    
+    ' UTF-8 output
     Dim stm As Object
     Set stm = CreateObject("ADODB.Stream")
-    stm.Type = 2 ' adTypeText
+    stm.Type = 2
     stm.Charset = "utf-8"
     stm.Open
-
-    ' Write header
+    
     stm.WriteText "table_number,caption_text" & vbCrLf
-
+    
+    Dim storyRange As Range
     Dim p As Paragraph
-    Dim t As String
+    Dim txt As String
     Dim m As Object
-    Dim tableNum As String, captionText As String
-    Dim count As Long: count = 0
-
-    For Each p In doc.Paragraphs
-        t = CleanParaText(p.Range.Text)
-
-        If Len(t) > 0 Then
-            If re.Test(t) Then
-                Set m = re.Execute(t)(0)
-                tableNum = Trim$(m.SubMatches(0))     ' left of colon
-                captionText = Trim$(m.SubMatches(1))  ' right of colon, no leading whitespace
-
-                stm.WriteText CsvEscape(tableNum) & "," & CsvEscape(captionText) & vbCrLf
-                count = count + 1
-            End If
-        End If
-    Next p
-
-    stm.SaveToFile outPath, 2 ' adSaveCreateOverWrite
+    Dim tableNum As String
+    Dim captionText As String
+    Dim count As Long
+    count = 0
+    
+    ' Loop through ALL story ranges (main body, headers, footers, shapes, etc.)
+    For Each storyRange In doc.StoryRanges
+        Do
+            For Each p In storyRange.Paragraphs
+                txt = CleanParaText(p.Range.Text)
+                
+                If Len(txt) > 0 Then
+                    If re.Test(txt) Then
+                        Set m = re.Execute(txt)(0)
+                        
+                        tableNum = Trim$(m.SubMatches(0))
+                        captionText = Trim$(m.SubMatches(1))
+                        
+                        stm.WriteText CsvEscape(tableNum) & "," & _
+                                      CsvEscape(captionText) & vbCrLf
+                        
+                        count = count + 1
+                    End If
+                End If
+            Next p
+            
+            Set storyRange = storyRange.NextStoryRange
+        Loop Until storyRange Is Nothing
+    Next storyRange
+    
+    stm.SaveToFile outPath, 2
     stm.Close
-
-    MsgBox "Exported " & count & " table captions to:" & vbCrLf & outPath, vbInformation
+    
+    MsgBox "Exported " & count & " captions to:" & vbCrLf & outPath, vbInformation
+    
 End Sub
 
 Private Function CleanParaText(ByVal s As String) As String
-    ' Word paragraph text often ends with Chr(13) and sometimes Chr(7)
     s = Replace(s, vbCr, "")
     s = Replace(s, Chr$(7), "")
     CleanParaText = Trim$(s)
 End Function
 
 Private Function CsvEscape(ByVal s As String) As String
-    ' CSV escaping: wrap in quotes if needed, and double internal quotes
     Dim needsQuotes As Boolean
-    needsQuotes = (InStr(s, ",") > 0) Or (InStr(s, """") > 0) Or (InStr(s, vbLf) > 0) Or (InStr(s, vbCr) > 0)
-
+    needsQuotes = (InStr(s, ",") > 0) Or _
+                  (InStr(s, """") > 0) Or _
+                  (InStr(s, vbLf) > 0) Or _
+                  (InStr(s, vbCr) > 0)
+    
     s = Replace(s, """", """""")
+    
     If needsQuotes Then
         CsvEscape = """" & s & """"
     Else
         CsvEscape = s
     End If
-End Function
-
-Private Function GetSavePathCSV() As String
-    Dim fd As FileDialog
-    Set fd = Application.FileDialog(msoFileDialogSaveAs)
-
-    With fd
-        .Title = "Save table captions CSV as..."
-        .InitialFileName = "table_captions.csv"
-        If .Show <> -1 Then
-            GetSavePathCSV = ""
-            Exit Function
-        End If
-        GetSavePathCSV = .SelectedItems(1)
-        If LCase$(Right$(GetSavePathCSV, 4)) <> ".csv" Then
-            GetSavePathCSV = GetSavePathCSV & ".csv"
-        End If
-    End With
 End Function
