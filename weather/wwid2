@@ -1,96 +1,54 @@
-Option Explicit
-
-Public Sub ExportTableCaptionsToCSV_2()
-
-    Dim doc As Document
-    Set doc = ActiveDocument
+Sub ExportTableCaptionsToCSV()
+    Dim tbl As Table
+    Dim para As Paragraph
+    Dim fullText As String
+    Dim tableCount As Integer
+    Dim outputPath As String
+    Dim fso As Object
+    Dim txtStream As Object
     
-    If doc.Path = "" Then
-        MsgBox "Please save the document first.", vbExclamation
-        Exit Sub
-    End If
+    ' Set output file path (same folder as document)
+    outputPath = ThisDocument.Path & "\table_captions.csv"
     
-    Dim outPath As String
-    outPath = doc.Path & Application.PathSeparator & "table_captions_2.csv"
+    ' Create FileSystemObject
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    Set txtStream = fso.CreateTextFile(outputPath, True)
     
-    ' Regex pattern
-    Dim re As Object
-    Set re = CreateObject("VBScript.RegExp")
-    With re
-        .Global = False
-        .IgnoreCase = True
-        .MultiLine = False
-        .Pattern = "^\s*(Table\s+\d+(?:-\d+)*)\s*:\s*(\S.*)\s*$"
-    End With
+    ' Write CSV header
+    txtStream.WriteLine "Full_Caption"
     
-    ' UTF-8 output
-    Dim stm As Object
-    Set stm = CreateObject("ADODB.Stream")
-    stm.Type = 2
-    stm.Charset = "utf-8"
-    stm.Open
+    tableCount = 1
     
-    stm.WriteText "table_number,caption_text" & vbCrLf
-    
-    Dim storyRange As Range
-    Dim p As Paragraph
-    Dim txt As String
-    Dim m As Object
-    Dim tableNum As String
-    Dim captionText As String
-    Dim count As Long
-    count = 0
-    
-    ' Loop through ALL story ranges (main body, headers, footers, shapes, etc.)
-    For Each storyRange In doc.StoryRanges
-        Do
-            For Each p In storyRange.Paragraphs
-                txt = CleanParaText(p.Range.Text)
-                
-                If Len(txt) > 0 Then
-                    If re.Test(txt) Then
-                        Set m = re.Execute(txt)(0)
-                        
-                        tableNum = Trim$(m.SubMatches(0))
-                        captionText = Trim$(m.SubMatches(1))
-                        
-                        stm.WriteText CsvEscape(tableNum) & "," & _
-                                      CsvEscape(captionText) & vbCrLf
-                        
-                        count = count + 1
-                    End If
-                End If
-            Next p
+    ' Loop through all tables
+    For Each tbl In ActiveDocument.Tables
+        fullText = ""
+        
+        ' Try to find caption (usually the paragraph before the table)
+        On Error Resume Next
+        fullText = tbl.Range.Paragraphs(1).Previous.Range.Text
+        On Error GoTo 0
+        
+        If fullText <> "" Then
+            ' Clean up line breaks only
+            fullText = Replace(fullText, vbCr, "")
+            fullText = Replace(fullText, vbLf, "")
+            fullText = Trim(fullText)
             
-            Set storyRange = storyRange.NextStoryRange
-        Loop Until storyRange Is Nothing
-    Next storyRange
+            ' Escape quotes for CSV
+            fullText = Replace(fullText, """", """""")
+            
+            ' Write full text to CSV
+            txtStream.WriteLine """" & fullText & """"
+        Else
+            ' No caption found
+            txtStream.WriteLine """"""
+        End If
+        
+        tableCount = tableCount + 1
+    Next tbl
     
-    stm.SaveToFile outPath, 2
-    stm.Close
+    txtStream.Close
     
-    MsgBox "Exported " & count & " captions to:" & vbCrLf & outPath, vbInformation
+    MsgBox "Exported " & (tableCount - 1) & " tables to:" & vbCrLf & outputPath, vbInformation
     
 End Sub
-
-Private Function CleanParaText(ByVal s As String) As String
-    s = Replace(s, vbCr, "")
-    s = Replace(s, Chr$(7), "")
-    CleanParaText = Trim$(s)
-End Function
-
-Private Function CsvEscape(ByVal s As String) As String
-    Dim needsQuotes As Boolean
-    needsQuotes = (InStr(s, ",") > 0) Or _
-                  (InStr(s, """") > 0) Or _
-                  (InStr(s, vbLf) > 0) Or _
-                  (InStr(s, vbCr) > 0)
-    
-    s = Replace(s, """", """""")
-    
-    If needsQuotes Then
-        CsvEscape = """" & s & """"
-    Else
-        CsvEscape = s
-    End If
-End Function
