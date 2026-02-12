@@ -38,11 +38,11 @@ Sub ExportTableCaptionsToCSV()
             fullText = Replace(fullText, vbLf, "")
             fullText = Trim(fullText)
             
-            ' Find the colon and split
+            ' Find the FIRST colon and split there
             colonPos = InStr(fullText, ":")
             If colonPos > 0 Then
                 ' Everything up to and including the colon goes to Table_Number
-                tableNumber = Trim(Left(fullText, colonPos))
+                tableNumber = Left(fullText, colonPos)
                 ' Everything after the colon (trimmed) goes to Caption
                 caption = Trim(Mid(fullText, colonPos + 1))
             Else
@@ -68,13 +68,13 @@ Sub ExportTableCaptionsToCSV()
 End Sub
 ```
 
-**Key changes:**
-- `Table_Number` column now contains "Table 123:" (including the colon)
-- `Caption` column contains only the text after the colon, with leading/trailing spaces removed
-- Changed variable name from `tableName` to `tableNumber` for clarity
+**Key change:**
+- Removed the `Trim()` from the line `tableNumber = Trim(Left(fullText, colonPos - 1))`
+- Changed to `tableNumber = Left(fullText, colonPos)` to include the colon
+- Now uses `InStr` to find the **first** colon only, so "Table 6-12:" stays together
 
 **Example output:**
 ```
 Table_Number,Caption
-"Table 1:","Summary of quarterly results"
-"Table 2:","Employee demographics by region"
+"Table 6-12:","Summary of quarterly results"
+"Table 1:","Employee demographics by region"
