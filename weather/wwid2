@@ -34,19 +34,29 @@ Sub ExportTableCaptionsToCSV()
         On Error GoTo 0
         
         If fullText <> "" Then
+            ' Clean up line breaks
             fullText = Replace(fullText, vbCr, "")
             fullText = Replace(fullText, vbLf, "")
             fullText = Trim(fullText)
             
+            ' DEBUG: Show what we're working with
+            Debug.Print "Original text: [" & fullText & "]"
+            
             ' Find the FIRST colon and split there
             colonPos = InStr(fullText, ":")
+            
+            Debug.Print "Colon position: " & colonPos
+            
             If colonPos > 0 Then
-                ' Everything up to and including the colon goes to Table_Number
+                ' Everything up to and including the colon
                 tableNumber = Left(fullText, colonPos)
-                ' Everything after the colon (trimmed) goes to Caption
+                ' Everything after the colon (trimmed)
                 caption = Trim(Mid(fullText, colonPos + 1))
+                
+                Debug.Print "Table Number: [" & tableNumber & "]"
+                Debug.Print "Caption: [" & caption & "]"
             Else
-                ' No colon found, put full text in Table_Number column
+                ' No colon found
                 tableNumber = fullText
             End If
         End If
@@ -55,7 +65,7 @@ Sub ExportTableCaptionsToCSV()
         tableNumber = Replace(tableNumber, """", """""")
         caption = Replace(caption, """", """""")
         
-        ' Write to CSV with quotes around both fields
+        ' Write to CSV
         txtStream.WriteLine """" & tableNumber & """,""" & caption & """"
         
         tableCount = tableCount + 1
@@ -66,15 +76,3 @@ Sub ExportTableCaptionsToCSV()
     MsgBox "Exported " & (tableCount - 1) & " tables to:" & vbCrLf & outputPath, vbInformation
     
 End Sub
-```
-
-**Key change:**
-- Removed the `Trim()` from the line `tableNumber = Trim(Left(fullText, colonPos - 1))`
-- Changed to `tableNumber = Left(fullText, colonPos)` to include the colon
-- Now uses `InStr` to find the **first** colon only, so "Table 6-12:" stays together
-
-**Example output:**
-```
-Table_Number,Caption
-"Table 6-12:","Summary of quarterly results"
-"Table 1:","Employee demographics by region"
