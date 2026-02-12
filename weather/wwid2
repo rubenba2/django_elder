@@ -24,8 +24,11 @@ Sub ExportTableCaptionsToCSV()
         caption = ""
         
         ' Try to find caption (usually the paragraph before the table)
-        If tbl.Range.Paragraphs(1).Previous IsNot Nothing Then
-            caption = tbl.Range.Paragraphs(1).Previous.Range.Text
+        On Error Resume Next
+        caption = tbl.Range.Paragraphs(1).Previous.Range.Text
+        On Error GoTo 0
+        
+        If caption <> "" Then
             caption = Replace(caption, vbCr, "")
             caption = Replace(caption, vbLf, "")
             caption = Replace(caption, """", """""") ' Escape quotes for CSV
