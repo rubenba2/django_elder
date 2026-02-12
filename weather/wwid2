@@ -1,11 +1,14 @@
 Sub ExportTableCaptionsToCSV()
     Dim tbl As Table
     Dim para As Paragraph
+    Dim fullText As String
+    Dim tableName As String
     Dim caption As String
     Dim tableNum As Integer
     Dim outputPath As String
     Dim fso As Object
     Dim txtStream As Object
+    Dim colonPos As Integer
     
     ' Set output file path (same folder as document)
     outputPath = ThisDocument.Path & "\table_captions.csv"
@@ -21,22 +24,37 @@ Sub ExportTableCaptionsToCSV()
     
     ' Loop through all tables
     For Each tbl In ActiveDocument.Tables
+        fullText = ""
+        tableName = ""
         caption = ""
         
         ' Try to find caption (usually the paragraph before the table)
         On Error Resume Next
-        caption = tbl.Range.Paragraphs(1).Previous.Range.Text
+        fullText = tbl.Range.Paragraphs(1).Previous.Range.Text
         On Error GoTo 0
         
-        If caption <> "" Then
-            caption = Replace(caption, vbCr, "")
-            caption = Replace(caption, vbLf, "")
-            caption = Replace(caption, """", """""") ' Escape quotes for CSV
-            caption = Trim(caption)
+        If fullText <> "" Then
+            fullText = Replace(fullText, vbCr, "")
+            fullText = Replace(fullText, vbLf, "")
+            fullText = Trim(fullText)
+            
+            ' Find the colon and split
+            colonPos = InStr(fullText, ":")
+            If colonPos > 0 Then
+                tableName = Trim(Left(fullText, colonPos - 1))
+                caption = Trim(Mid(fullText, colonPos + 1))
+            Else
+                ' No colon found, use full text as caption
+                caption = fullText
+            End If
         End If
         
-        ' Write to CSV with quotes around caption
-        txtStream.WriteLine tableNum & ",""" & caption & """"
+        ' Escape quotes for CSV
+        tableName = Replace(tableName, """", """""")
+        caption = Replace(caption, """", """""")
+        
+        ' Write to CSV with quotes around both fields
+        txtStream.WriteLine """" & tableName & """,""" & caption & """"
         
         tableNum = tableNum + 1
     Next tbl
