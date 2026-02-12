@@ -2,9 +2,9 @@ Sub ExportTableCaptionsToCSV()
     Dim tbl As Table
     Dim para As Paragraph
     Dim fullText As String
-    Dim tableName As String
+    Dim tableNumber As String
     Dim caption As String
-    Dim tableNum As Integer
+    Dim tableCount As Integer
     Dim outputPath As String
     Dim fso As Object
     Dim txtStream As Object
@@ -20,12 +20,12 @@ Sub ExportTableCaptionsToCSV()
     ' Write CSV header
     txtStream.WriteLine "Table_Number,Caption"
     
-    tableNum = 1
+    tableCount = 1
     
     ' Loop through all tables
     For Each tbl In ActiveDocument.Tables
         fullText = ""
-        tableName = ""
+        tableNumber = ""
         caption = ""
         
         ' Try to find caption (usually the paragraph before the table)
@@ -41,26 +41,40 @@ Sub ExportTableCaptionsToCSV()
             ' Find the colon and split
             colonPos = InStr(fullText, ":")
             If colonPos > 0 Then
-                tableName = Trim(Left(fullText, colonPos - 1))
+                ' Everything up to and including the colon goes to Table_Number
+                tableNumber = Trim(Left(fullText, colonPos))
+                ' Everything after the colon (trimmed) goes to Caption
                 caption = Trim(Mid(fullText, colonPos + 1))
             Else
-                ' No colon found, use full text as caption
-                caption = fullText
+                ' No colon found, put full text in Table_Number column
+                tableNumber = fullText
             End If
         End If
         
         ' Escape quotes for CSV
-        tableName = Replace(tableName, """", """""")
+        tableNumber = Replace(tableNumber, """", """""")
         caption = Replace(caption, """", """""")
         
         ' Write to CSV with quotes around both fields
-        txtStream.WriteLine """" & tableName & """,""" & caption & """"
+        txtStream.WriteLine """" & tableNumber & """,""" & caption & """"
         
-        tableNum = tableNum + 1
+        tableCount = tableCount + 1
     Next tbl
     
     txtStream.Close
     
-    MsgBox "Exported " & (tableNum - 1) & " tables to:" & vbCrLf & outputPath, vbInformation
+    MsgBox "Exported " & (tableCount - 1) & " tables to:" & vbCrLf & outputPath, vbInformation
     
 End Sub
+```
+
+**Key changes:**
+- `Table_Number` column now contains "Table 123:" (including the colon)
+- `Caption` column contains only the text after the colon, with leading/trailing spaces removed
+- Changed variable name from `tableName` to `tableNumber` for clarity
+
+**Example output:**
+```
+Table_Number,Caption
+"Table 1:","Summary of quarterly results"
+"Table 2:","Employee demographics by region"
