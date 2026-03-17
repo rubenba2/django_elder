@@ -1,7 +1,1 @@
-from pathlib import Path
-open("lines_with_INPUT.txt","w",encoding="utf-8").writelines(
-    f"{f.name} | line {i} | {line}\n"
-    for f in Path(".").glob("*.py")
-    for i, line in enumerate(f.read_text(encoding="utf-8", errors="ignore").splitlines(), 1)
-    if "INPUT" in line.upper()
-)
+
